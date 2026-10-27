@@ -109,7 +109,7 @@ export function Sidebar({
   const shell = (
     <div className="flex h-full flex-col bg-brand-900 text-white">
       <Link href="/" className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-        <Image src="/logo.svg" alt="" width={38} height={38} priority />
+        <Image src="/logo.png" alt="Logo Trường Cao đẳng Công nghiệp Bắc Ninh" width={42} height={42} priority className="shrink-0 rounded-full bg-white p-0.5" />
         <div className="min-w-0 leading-tight">
           <div className="truncate text-[15px] font-semibold">{FACULTY_NAME}</div>
           <div className="text-[11px] text-blue-200/70">CĐ Công nghiệp Bắc Ninh</div>
@@ -150,7 +150,7 @@ export function Sidebar({
         >
           <Menu className="size-5" />
         </button>
-        <Image src="/logo.svg" alt="" width={30} height={30} />
+        <Image src="/logo.png" alt="Logo Trường Cao đẳng Công nghiệp Bắc Ninh" width={32} height={32} className="rounded-full bg-white p-px" />
         <span className="truncate font-semibold">{FACULTY_NAME}</span>
       </div>
 

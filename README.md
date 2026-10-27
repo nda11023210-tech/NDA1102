@@ -116,7 +116,7 @@ Mỗi lần `git push` lên nhánh đã kết nối, Hostinger tự build và kh
 
 ## Thay logo & màu nhận diện
 
-- Logo: thay `public/logo.svg` và `src/app/icon.svg` (favicon).
+- Logo: thay `public/logo.png` và `src/app/icon.png` (favicon).
 - Màu: sửa các biến `--brand-*` và `--action` ở đầu `src/app/globals.css`.
 - Tên Khoa/Trường: `src/lib/constants.ts`.
 

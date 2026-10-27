@@ -36,7 +36,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div aria-hidden className="pointer-events-none absolute -bottom-48 -left-32 size-[460px] rounded-full bg-amber-400/10 blur-3xl" />
 
         <div className="relative flex items-center gap-3">
-          <Image src="/logo.svg" alt="" width={48} height={48} priority />
+          <Image src="/logo.png" alt="Logo Trường Cao đẳng Công nghiệp Bắc Ninh" width={56} height={56} priority className="rounded-full bg-white p-0.5 shadow-lg ring-2 ring-white/20" />
           <div>
             <div className="text-xs font-medium tracking-[0.14em] text-blue-200 uppercase">{SCHOOL_NAME}</div>
             <div className="text-lg font-semibold">{FACULTY_NAME}</div>
@@ -68,7 +68,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <section className="flex items-center justify-center px-4 py-12 sm:px-8">
         <div className="w-full max-w-[400px]">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <Image src="/logo.svg" alt="" width={44} height={44} priority />
+            <Image src="/logo.png" alt="Logo Trường Cao đẳng Công nghiệp Bắc Ninh" width={52} height={52} priority className="rounded-full bg-white" />
             <div>
               <div className="text-[11px] font-medium tracking-wider text-ink-muted uppercase">{SCHOOL_NAME}</div>
               <div className="font-semibold text-ink">{FACULTY_NAME}</div>
