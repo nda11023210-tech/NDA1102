@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { fail, type ActionState } from "@/lib/action-state";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from "@/lib/session";
-import type { Role } from "@/lib/constants";
+import { normalizeRole } from "@/lib/constants";
 import { str } from "@/lib/utils";
 
 export async function loginAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -21,7 +21,7 @@ export async function loginAction(_: ActionState, fd: FormData): Promise<ActionS
   if (!user || !valid) return fail("Email hoặc mật khẩu không đúng.");
   if (!user.active) return fail("Tài khoản đã bị khóa. Vui lòng liên hệ Quản trị viên.");
 
-  const token = await signSession({ sub: user.id, name: user.name, role: user.role as Role });
+  const token = await signSession({ sub: user.id, name: user.name, role: normalizeRole(user.role) });
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",

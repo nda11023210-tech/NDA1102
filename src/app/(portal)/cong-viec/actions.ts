@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireRole, requireUser } from "@/lib/auth";
+import { isManager, requireRole, requireUser } from "@/lib/auth";
 import { attempt, fail, ok, type ActionState } from "@/lib/action-state";
 import { saveUploads } from "@/lib/uploads";
 import { TASK_PRIORITY } from "@/lib/constants";
@@ -16,7 +16,7 @@ const refresh = (id?: string) => {
 
 export async function createTask(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    const user = await requireRole("HEAD", "ASSISTANT");
+    const user = await requireRole("MANAGER");
     const title = str(fd, "title");
     const dueAt = fromLocalInput(str(fd, "dueAt"));
     const assigneeIds = fd.getAll("assigneeId").map(String).filter(Boolean);
@@ -52,7 +52,7 @@ export async function updateTaskStatus(_: ActionState, fd: FormData): Promise<Ac
     const intent = str(fd, "intent");
     const task = await db.task.findUniqueOrThrow({ where: { id } });
     const isAssignee = task.assigneeId === user.id;
-    const isAssigner = task.assignerId === user.id || user.role === "ADMIN" || user.role === "HEAD";
+    const isAssigner = task.assignerId === user.id || isManager(user);
     const note = str(fd, "note");
 
     if (intent === "start" && isAssignee && ["TODO", "REVISION"].includes(task.status)) {
@@ -93,7 +93,7 @@ export async function addComment(_: ActionState, fd: FormData): Promise<ActionSt
     const content = str(fd, "content");
     if (!content) return fail("Nội dung trống.");
     const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    if (![task.assigneeId, task.assignerId].includes(user.id) && !["ADMIN", "HEAD"].includes(user.role)) return fail("Bạn không tham gia công việc này.");
+    if (![task.assigneeId, task.assignerId].includes(user.id) && !isManager(user)) return fail("Bạn không tham gia công việc này.");
     await db.taskComment.create({ data: { taskId, userId: user.id, content } });
     refresh(taskId);
     return ok("Đã gửi trao đổi.");

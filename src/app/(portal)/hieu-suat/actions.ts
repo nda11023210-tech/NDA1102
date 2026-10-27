@@ -19,7 +19,7 @@ Yêu cầu:
 - Chỉ dựa trên số liệu được cung cấp. Không suy đoán về hoàn cảnh cá nhân, không bịa thêm sự kiện.
 - Cấu trúc 3 phần, mỗi phần có tiêu đề in đậm dạng **Điểm mạnh**, **Điểm cần cải thiện**, **Đề xuất**; mỗi phần 1–3 gạch đầu dòng ngắn.
 - Tổng độ dài dưới 200 từ. Không lặp lại toàn bộ bảng số liệu.
-- Đây là gợi ý hỗ trợ Trưởng khoa; kết luận cuối cùng thuộc về người đánh giá.`;
+- Đây là gợi ý hỗ trợ Quản lý khoa; kết luận cuối cùng thuộc về người đánh giá.`;
 
 function fallbackSummary(name: string, p: PerfResult) {
   const strong: string[] = [];

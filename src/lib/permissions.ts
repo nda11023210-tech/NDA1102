@@ -1,22 +1,21 @@
 import type { Role } from "./constants";
 
 type U = { role: Role };
-const is = (u: U, ...roles: Role[]) => u.role === "ADMIN" || roles.includes(u.role);
+const manager = (u: U) => u.role === "ADMIN" || u.role === "MANAGER";
 
-/** Người dùng có thể duyệt minh chứng ở trạng thái hiện tại không */
+/** Trạng thái minh chứng đang chờ duyệt (ASSISTANT_APPROVED là trạng thái của quy trình 2 cấp cũ) */
+export const PENDING_EVIDENCE = ["SUBMITTED", "ASSISTANT_APPROVED"];
+
+/** Quản lý khoa duyệt minh chứng một lần là xong */
 export function canReviewEvidence(u: U, status: string) {
-  return (status === "SUBMITTED" && is(u, "ASSISTANT")) || (status === "ASSISTANT_APPROVED" && is(u, "HEAD"));
+  return manager(u) && PENDING_EVIDENCE.includes(status);
 }
 
-/** Trạng thái minh chứng mà vai trò này cần xử lý */
 export function reviewQueueStatuses(u: U) {
-  if (u.role === "ADMIN") return ["SUBMITTED", "ASSISTANT_APPROVED"];
-  if (u.role === "ASSISTANT") return ["SUBMITTED"];
-  if (u.role === "HEAD") return ["ASSISTANT_APPROVED"];
-  return [];
+  return manager(u) ? PENDING_EVIDENCE : [];
 }
 
-export const canAssignTasks = (u: U) => is(u, "HEAD", "ASSISTANT");
-export const canViewAllPerformance = (u: U) => is(u, "HEAD");
-export const canManageTimetable = (u: U) => is(u, "HEAD", "ASSISTANT");
-export const canManageKb = (u: U) => is(u, "HEAD", "ASSISTANT");
+export const canAssignTasks = manager;
+export const canViewAllPerformance = manager;
+export const canManageTimetable = manager;
+export const canManageKb = manager;

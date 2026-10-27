@@ -8,7 +8,7 @@ import { PrintButton } from "@/components/print-button";
 export const metadata = { title: "In tem QR" };
 
 export default async function PrintLabels({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   const { cat } = await searchParams;
   const assets = await db.asset.findMany({
     where: { status: { not: "LIQUIDATED" }, ...(cat ? { category: cat } : {}) },

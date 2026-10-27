@@ -213,7 +213,7 @@ export function ChatBox({
           )}
         </div>
         <p className="mx-auto mt-1.5 max-w-3xl text-center text-[11px] text-ink-muted">
-          Trợ lý có thể sai sót. Với quyết định quan trọng, vui lòng đối chiếu văn bản gốc hoặc hỏi Trợ lý khoa.
+          Trợ lý có thể sai sót. Với quyết định quan trọng, vui lòng đối chiếu văn bản gốc hoặc hỏi Quản lý khoa.
         </p>
       </form>
     </div>

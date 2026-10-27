@@ -10,7 +10,7 @@ export function SignToggle() {
         <input type="checkbox" name="requireSign" checked={on} onChange={(e) => setOn(e.target.checked)} className="mt-1 size-4 accent-blue-600" />
         <span>
           <span className="block text-sm font-medium text-ink">Yêu cầu ký nhận điện tử</span>
-          <span className="block text-xs text-ink-muted">Mỗi cán bộ, giảng viên phải xác nhận đã đọc bằng cách ký tên. Trợ lý theo dõi được tiến độ ký nhận.</span>
+          <span className="block text-xs text-ink-muted">Mỗi cán bộ, giảng viên phải xác nhận đã đọc bằng cách ký tên. Quản lý khoa theo dõi được tiến độ ký nhận.</span>
         </span>
       </label>
       {on && (

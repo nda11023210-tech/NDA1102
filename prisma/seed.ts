@@ -82,9 +82,9 @@ async function main() {
 
   // ───────── Người dùng ─────────
   const admin = await mk("admin@cntt.bnic.edu.vn", "Quản trị Hệ thống", "ADMIN", "KS.");
-  const head = await mk("truongkhoa@cntt.bnic.edu.vn", "Nguyễn Văn Hùng", "HEAD", "TS.", "Hệ thống thông tin");
-  const asst1 = await mk("troly1@cntt.bnic.edu.vn", "Trần Thị Thu Hà", "ASSISTANT", "ThS.", "Quản lý đào tạo");
-  const asst2 = await mk("troly2@cntt.bnic.edu.vn", "Lê Minh Đức", "ASSISTANT", "ThS.", "Quản trị thiết bị");
+  const head = await mk("truongkhoa@cntt.bnic.edu.vn", "Nguyễn Văn Hùng", "MANAGER", "TS.", "Hệ thống thông tin");
+  const asst1 = await mk("troly1@cntt.bnic.edu.vn", "Trần Thị Thu Hà", "MANAGER", "ThS.", "Quản lý đào tạo");
+  const asst2 = await mk("troly2@cntt.bnic.edu.vn", "Lê Minh Đức", "MANAGER", "ThS.", "Quản trị thiết bị");
   const lecturerSpecs: [string, string, string][] = [
     ["gv.anh@cntt.bnic.edu.vn", "Phạm Quốc Anh", "Lập trình"],
     ["gv.binh@cntt.bnic.edu.vn", "Đỗ Thanh Bình", "Mạng máy tính"],
@@ -129,7 +129,7 @@ async function main() {
       title: "Kế hoạch kiểm định chất lượng chương trình đào tạo ngành CNTT năm 2026",
       summary: "Triển khai thu thập minh chứng theo bộ tiêu chí kiểm định, hoàn thành trước 30/11/2026.",
       content:
-        "Căn cứ hướng dẫn của Sở về kiểm định chất lượng chương trình đào tạo trình độ cao đẳng, Khoa xây dựng kế hoạch như sau:\n\n1. Thành lập tổ tự đánh giá do Trưởng khoa làm tổ trưởng.\n2. Giảng viên nộp minh chứng theo tiêu chí trên Cổng quản trị (mục Minh chứng Sở ban ngành).\n3. Trợ lý khoa rà soát cấp 1, Trưởng khoa phê duyệt cấp 2.\n4. Hạn hoàn thành: 30/11/2026.",
+        "Căn cứ hướng dẫn của Sở về kiểm định chất lượng chương trình đào tạo trình độ cao đẳng, Khoa xây dựng kế hoạch như sau:\n\n1. Thành lập tổ tự đánh giá do Trưởng khoa làm tổ trưởng.\n2. Giảng viên nộp minh chứng theo tiêu chí trên Cổng quản trị (mục Minh chứng Sở ban ngành).\n3. Quản lý khoa rà soát và phê duyệt minh chứng trên hệ thống.\n4. Hạn hoàn thành: 30/11/2026.",
       sign: true,
       issued: -10,
       due: -3,
@@ -158,7 +158,7 @@ async function main() {
       number: "139/TB-KCNTT",
       title: "Thông báo đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027",
       summary: "Giảng viên đăng ký đề tài NCKH cấp trường, nộp thuyết minh trước 20/12/2026.",
-      content: "Khoa thông báo tới giảng viên về việc đăng ký đề tài NCKH cấp trường năm 2027. Hồ sơ gồm: phiếu đăng ký, thuyết minh đề tài theo mẫu. Nộp bản mềm cho Trợ lý khoa trước ngày 20/12/2026.",
+      content: "Khoa thông báo tới giảng viên về việc đăng ký đề tài NCKH cấp trường năm 2027. Hồ sơ gồm: phiếu đăng ký, thuyết minh đề tài theo mẫu. Nộp bản mềm cho Quản lý khoa trước ngày 20/12/2026.",
       sign: false,
       issued: -14,
     },
@@ -176,7 +176,7 @@ async function main() {
       number: "131/TB-KCNTT",
       title: "Thông báo kiểm kê tài sản, thiết bị cuối năm 2026",
       summary: "Khoa tiến hành kiểm kê toàn bộ thiết bị bằng mã QR từ ngày 01/12/2026.",
-      content: "Đề nghị giảng viên phụ trách phòng thực hành phối hợp với Trợ lý khoa kiểm tra, dán tem QR còn thiếu và báo cáo thiết bị hư hỏng trước khi kiểm kê.",
+      content: "Đề nghị giảng viên phụ trách phòng thực hành phối hợp với Quản lý khoa kiểm tra, dán tem QR còn thiếu và báo cáo thiết bị hư hỏng trước khi kiểm kê.",
       sign: true,
       issued: -30,
       due: -22,
@@ -324,24 +324,23 @@ async function main() {
   const flows: string[][] = [
     ["SUBMIT"],
     ["SUBMIT"],
-    ["SUBMIT", "APPROVE_L1"],
-    ["SUBMIT", "APPROVE_L1"],
-    ["SUBMIT", "APPROVE_L1", "APPROVE_L2"],
-    ["SUBMIT", "APPROVE_L1", "APPROVE_L2"],
-    ["SUBMIT", "APPROVE_L1", "APPROVE_L2"],
+    ["SUBMIT"],
+    ["SUBMIT", "APPROVE"],
+    ["SUBMIT", "APPROVE"],
+    ["SUBMIT", "APPROVE"],
+    ["SUBMIT", "APPROVE"],
     ["SUBMIT", "REJECT"],
     ["SUBMIT", "REJECT", "RESUBMIT"],
-    ["SUBMIT", "APPROVE_L1", "REJECT"],
+    ["SUBMIT", "REJECT", "RESUBMIT", "APPROVE"],
   ];
   const statusAfter = (flow: string[]) => {
     const last = flow[flow.length - 1];
-    return last === "APPROVE_L2" ? "APPROVED" : last === "APPROVE_L1" ? "ASSISTANT_APPROVED" : last === "REJECT" ? "REJECTED" : "SUBMITTED";
+    return last === "APPROVE" ? "APPROVED" : last === "REJECT" ? "REJECTED" : "SUBMITTED";
   };
   const comments: Record<string, string | null> = {
     SUBMIT: null,
     RESUBMIT: "Đã bổ sung bản có chữ ký.",
-    APPROVE_L1: "Hồ sơ đầy đủ, chuyển Trưởng khoa.",
-    APPROVE_L2: "Đồng ý.",
+    APPROVE: "Hồ sơ đầy đủ, đồng ý.",
     REJECT: "Thiếu chữ ký của tổ trưởng bộ môn, đề nghị bổ sung.",
   };
   let k = 0;
@@ -350,7 +349,7 @@ async function main() {
     [camp2, 9, 130],
   ] as const) {
     for (let i = 0; i < count; i++) {
-      const flow = camp === camp2 ? ["SUBMIT", "APPROVE_L1", "APPROVE_L2"] : flows[k++ % flows.length];
+      const flow = camp === camp2 ? ["SUBMIT", "APPROVE"] : flows[k++ % flows.length];
       const submitter = lecturers[(i * 5) % lecturers.length];
       const crit = camp.criteria[i % camp.criteria.length];
       const created = new Date(now - (ageBase - i * 0.6) * DAY);
@@ -370,7 +369,7 @@ async function main() {
         await db.evidenceLog.create({
           data: {
             evidenceId: ev.id,
-            actorId: action === "APPROVE_L2" ? head.id : action.startsWith("APPROVE") || action === "REJECT" ? asst1.id : submitter.id,
+            actorId: action === "APPROVE" || action === "REJECT" ? pick([head, asst1]).id : submitter.id,
             action,
             comment: comments[action],
             createdAt: new Date(t),
@@ -514,13 +513,13 @@ async function main() {
       "Quy trình xin nghỉ phép năm",
       "Nhân sự",
       "nghỉ phép, phép năm, đơn xin nghỉ",
-      "## Đối tượng\nCán bộ, giảng viên cơ hữu của Khoa.\n\n## Các bước thực hiện\n1. Điền **Đơn xin nghỉ phép** (Biểu mẫu BM-01 trong mục Văn bản) trước ít nhất **03 ngày làm việc**.\n2. Nếu nghỉ trùng lịch dạy: ghi rõ phương án dạy bù hoặc người dạy thay vào đơn.\n3. Gửi đơn cho Trợ lý khoa để kiểm tra lịch giảng dạy.\n4. Trưởng khoa ký duyệt; Trợ lý khoa chuyển Phòng Tổ chức – Hành chính.\n\n## Lưu ý\n- Số ngày phép năm theo quy định của Bộ luật Lao động (tối thiểu 12 ngày/năm, cộng thâm niên).\n- Trường hợp ốm đau đột xuất: báo Trợ lý khoa qua điện thoại trong buổi sáng, bổ sung đơn sau khi đi làm trở lại.",
+      "## Đối tượng\nCán bộ, giảng viên cơ hữu của Khoa.\n\n## Các bước thực hiện\n1. Điền **Đơn xin nghỉ phép** (Biểu mẫu BM-01 trong mục Văn bản) trước ít nhất **03 ngày làm việc**.\n2. Nếu nghỉ trùng lịch dạy: ghi rõ phương án dạy bù hoặc người dạy thay vào đơn.\n3. Gửi đơn cho Quản lý khoa để kiểm tra lịch giảng dạy.\n4. Quản lý khoa ký duyệt và chuyển Phòng Tổ chức – Hành chính.\n\n## Lưu ý\n- Số ngày phép năm theo quy định của Bộ luật Lao động (tối thiểu 12 ngày/năm, cộng thâm niên).\n- Trường hợp ốm đau đột xuất: báo Quản lý khoa qua điện thoại trong buổi sáng, bổ sung đơn sau khi đi làm trở lại.",
     ],
     [
       "Quy định đổi giờ, dạy bù",
       "Đào tạo",
       "đổi giờ, dạy bù, nghỉ dạy, đổi lịch",
-      "1. Giảng viên muốn đổi giờ dạy phải đăng ký với Trợ lý khoa trước **ít nhất 02 ngày**.\n2. Buổi dạy bù phải được xếp trong vòng **02 tuần** kể từ buổi nghỉ.\n3. Trợ lý khoa kiểm tra phòng trống trên Thời khóa biểu, cập nhật và thông báo cho lớp.\n4. Mô-đun (MĐ) phải dạy bù tại phòng thực hành; Môn học (MH) dạy bù tại phòng lý thuyết.\n5. Mỗi học kỳ, một giảng viên không đổi giờ quá **04 buổi** nếu không có lý do đặc biệt.",
+      "1. Giảng viên muốn đổi giờ dạy phải đăng ký với Quản lý khoa trước **ít nhất 02 ngày**.\n2. Buổi dạy bù phải được xếp trong vòng **02 tuần** kể từ buổi nghỉ.\n3. Quản lý khoa kiểm tra phòng trống trên Thời khóa biểu, cập nhật và thông báo cho lớp.\n4. Mô-đun (MĐ) phải dạy bù tại phòng thực hành; Môn học (MH) dạy bù tại phòng lý thuyết.\n5. Mỗi học kỳ, một giảng viên không đổi giờ quá **04 buổi** nếu không có lý do đặc biệt.",
     ],
     [
       "Định mức giờ giảng và cách tính giờ chuẩn",
@@ -532,31 +531,31 @@ async function main() {
       "Hướng dẫn mượn, trả thiết bị dạy học",
       "Tài sản",
       "mượn máy chiếu, mượn laptop, thiết bị, QR",
-      "1. Mở mục **Tài sản & Thiết bị**, tìm thiết bị cần mượn (hoặc quét mã QR dán trên thiết bị bằng camera điện thoại).\n2. Bấm **Đăng ký mượn**, nhập mục đích và thời gian mượn – trả.\n3. Trợ lý khoa duyệt yêu cầu trên hệ thống; nhận thiết bị tại Văn phòng Khoa (A1.104).\n4. Khi trả, kiểm tra tình trạng cùng Trợ lý khoa. Thiết bị hư hỏng sẽ được chuyển sang trạng thái Bảo trì.\n\n**Lưu ý:** trả thiết bị đúng hạn; quá hạn 2 lần trong học kỳ sẽ bị tạm dừng quyền mượn.",
+      "1. Mở mục **Tài sản & Thiết bị**, tìm thiết bị cần mượn (hoặc quét mã QR dán trên thiết bị bằng camera điện thoại).\n2. Bấm **Đăng ký mượn**, nhập mục đích và thời gian mượn – trả.\n3. Quản lý khoa duyệt yêu cầu trên hệ thống; nhận thiết bị tại Văn phòng Khoa (A1.104).\n4. Khi trả, kiểm tra tình trạng cùng Quản lý khoa. Thiết bị hư hỏng sẽ được chuyển sang trạng thái Bảo trì.\n\n**Lưu ý:** trả thiết bị đúng hạn; quá hạn 2 lần trong học kỳ sẽ bị tạm dừng quyền mượn.",
     ],
     [
       "Hồ sơ giảng dạy giảng viên cần chuẩn bị",
       "Đào tạo",
       "hồ sơ giảng dạy, giáo án, giảng viên mới, sổ tay",
-      "Mỗi học kỳ, giảng viên chuẩn bị đầy đủ:\n- Chương trình, đề cương chi tiết mô-đun/môn học được giao.\n- Kế hoạch giảng dạy (theo mẫu Phòng Đào tạo).\n- Giáo án (bản in hoặc điện tử) cho từng bài.\n- Sổ tay giáo viên, sổ lên lớp.\n- Đề kiểm tra, đáp án và bảng điểm.\n\nGiảng viên mới: liên hệ Trợ lý khoa để được cấp tài khoản Cổng quản trị, nhận mẫu biểu và được phân công người hướng dẫn trong học kỳ đầu.",
+      "Mỗi học kỳ, giảng viên chuẩn bị đầy đủ:\n- Chương trình, đề cương chi tiết mô-đun/môn học được giao.\n- Kế hoạch giảng dạy (theo mẫu Phòng Đào tạo).\n- Giáo án (bản in hoặc điện tử) cho từng bài.\n- Sổ tay giáo viên, sổ lên lớp.\n- Đề kiểm tra, đáp án và bảng điểm.\n\nGiảng viên mới: liên hệ Quản lý khoa để được cấp tài khoản Cổng quản trị, nhận mẫu biểu và được phân công người hướng dẫn trong học kỳ đầu.",
     ],
     [
       "Quy trình nộp và duyệt minh chứng",
       "Kiểm định",
       "minh chứng, kiểm định, duyệt, sở",
-      "1. Vào mục **Minh chứng Sở ban ngành**, chọn đợt đang mở.\n2. Chọn đúng **tiêu chí**, nhập tên minh chứng và đính kèm tệp (PDF/ảnh scan có chữ ký).\n3. Hồ sơ tự động chuyển tới **Trợ lý khoa** duyệt cấp 1, sau đó tới **Trưởng khoa** phê duyệt cấp 2.\n4. Nếu bị trả hồ sơ, xem lý do trong lịch sử xử lý, bổ sung và bấm **Nộp lại**.\n\nTrợ lý khoa có thể xuất báo cáo toàn bộ minh chứng ra Excel để gửi Sở.",
+      "1. Vào mục **Minh chứng Sở ban ngành**, chọn đợt đang mở.\n2. Chọn đúng **tiêu chí**, nhập tên minh chứng và đính kèm tệp (PDF/ảnh scan có chữ ký).\n3. Hồ sơ được chuyển tới **Quản lý khoa** phê duyệt (một lần). Tên người duyệt và thời gian được ghi vào lịch sử, không thể sửa.\n4. Nếu bị trả hồ sơ, xem lý do trong lịch sử xử lý, bổ sung và bấm **Nộp lại**.\n\nQuản lý khoa có thể xuất báo cáo toàn bộ minh chứng ra Excel để gửi Sở.",
     ],
     [
       "Quy định về coi thi, chấm thi",
       "Khảo thí",
       "coi thi, chấm thi, đề thi, phúc khảo",
-      "- Đề thi kết thúc mô-đun/môn học nộp cho Trợ lý khoa trước kỳ thi **10 ngày**, kèm đáp án và thang điểm.\n- Mỗi phòng thi có 02 cán bộ coi thi; có mặt trước giờ thi 15 phút.\n- Bài thi chấm 2 vòng độc lập đối với môn thi tự luận.\n- Điểm thi nhập lên hệ thống chậm nhất **07 ngày** sau khi thi.\n- Sinh viên phúc khảo trong vòng 05 ngày kể từ ngày công bố điểm.",
+      "- Đề thi kết thúc mô-đun/môn học nộp cho Quản lý khoa trước kỳ thi **10 ngày**, kèm đáp án và thang điểm.\n- Mỗi phòng thi có 02 cán bộ coi thi; có mặt trước giờ thi 15 phút.\n- Bài thi chấm 2 vòng độc lập đối với môn thi tự luận.\n- Điểm thi nhập lên hệ thống chậm nhất **07 ngày** sau khi thi.\n- Sinh viên phúc khảo trong vòng 05 ngày kể từ ngày công bố điểm.",
     ],
     [
       "Đăng ký đề tài nghiên cứu khoa học",
       "Nghiên cứu khoa học",
       "NCKH, đề tài, nghiên cứu, thuyết minh",
-      "1. Theo dõi thông báo đăng ký đề tài trong mục Văn bản (thường vào tháng 11–12 hằng năm).\n2. Chuẩn bị phiếu đăng ký và thuyết minh đề tài theo mẫu.\n3. Nộp cho Trợ lý khoa; Khoa tổ chức hội đồng xét chọn cấp Khoa.\n4. Đề tài được chọn gửi lên Phòng Khoa học – Hợp tác quốc tế xét duyệt cấp trường.\n\nMỗi giảng viên nên có ít nhất 01 sản phẩm NCKH/năm (đề tài, bài báo, giáo trình hoặc sáng kiến).",
+      "1. Theo dõi thông báo đăng ký đề tài trong mục Văn bản (thường vào tháng 11–12 hằng năm).\n2. Chuẩn bị phiếu đăng ký và thuyết minh đề tài theo mẫu.\n3. Nộp cho Quản lý khoa; Khoa tổ chức hội đồng xét chọn cấp Khoa.\n4. Đề tài được chọn gửi lên Phòng Khoa học – Hợp tác quốc tế xét duyệt cấp trường.\n\nMỗi giảng viên nên có ít nhất 01 sản phẩm NCKH/năm (đề tài, bài báo, giáo trình hoặc sáng kiến).",
     ],
     [
       "Chế độ công tác của giảng viên",
@@ -568,7 +567,7 @@ async function main() {
       "Sử dụng phòng thực hành máy tính",
       "Tài sản",
       "phòng máy, phòng thực hành, nội quy, cài đặt phần mềm",
-      "- Giảng viên dạy buổi đầu tiên mỗi tuần kiểm tra tình trạng phòng máy và ghi vào sổ theo dõi.\n- Không tự ý cài đặt phần mềm không có bản quyền. Yêu cầu cài phần mềm gửi Trợ lý khoa trước **03 ngày**.\n- Sự cố máy hỏng: ghi số máy, mô tả lỗi và báo qua mục Tài sản để chuyển trạng thái Bảo trì.\n- Cuối buổi: tắt máy, tắt điều hòa, khóa cửa và bàn giao chìa khóa.",
+      "- Giảng viên dạy buổi đầu tiên mỗi tuần kiểm tra tình trạng phòng máy và ghi vào sổ theo dõi.\n- Không tự ý cài đặt phần mềm không có bản quyền. Yêu cầu cài phần mềm gửi Quản lý khoa trước **03 ngày**.\n- Sự cố máy hỏng: ghi số máy, mô tả lỗi và báo qua mục Tài sản để chuyển trạng thái Bảo trì.\n- Cuối buổi: tắt máy, tắt điều hòa, khóa cửa và bàn giao chìa khóa.",
     ],
   ];
   for (const [title, category, tags, content] of kb) {
@@ -578,8 +577,7 @@ async function main() {
   console.log("✔ Đã nạp dữ liệu mẫu.");
   console.log(`  Tài khoản (mật khẩu: ${process.env.SEED_PASSWORD ? "theo SEED_PASSWORD" : "Kcntt@2026"}):`);
   console.log(`  - Quản trị:   ${admin.email}`);
-  console.log(`  - Trưởng khoa: ${head.email}`);
-  console.log(`  - Trợ lý:     ${asst1.email}, ${asst2.email}`);
+  console.log(`  - Quản lý khoa: ${head.email}, ${asst1.email}, ${asst2.email}`);
   console.log(`  - Giảng viên: ${lecturers[0].email} (và 11 tài khoản gv.* khác)`);
 }
 

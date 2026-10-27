@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/sidebar";
-import { requireUser, isManager, hasRole } from "@/lib/auth";
+import { requireUser, isManager } from "@/lib/auth";
+import { PENDING_EVIDENCE } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { logoutAction } from "../login/actions";
 
@@ -15,11 +16,9 @@ export default async function PortalLayout({ children }: { children: React.React
       where: { requireSign: true, NOT: { receipts: { some: { userId: user.id, signedAt: { not: null } } } } },
     }),
     manager ? db.assetLoan.count({ where: { status: "PENDING" } }) : Promise.resolve(0),
-    hasRole(user, "ASSISTANT")
-      ? db.evidence.count({ where: { status: user.role === "ADMIN" ? { in: ["SUBMITTED", "ASSISTANT_APPROVED"] } : "SUBMITTED" } })
-      : hasRole(user, "HEAD")
-        ? db.evidence.count({ where: { status: "ASSISTANT_APPROVED" } })
-        : db.evidence.count({ where: { submitterId: user.id, status: "REJECTED" } }),
+    manager
+      ? db.evidence.count({ where: { status: { in: PENDING_EVIDENCE } } })
+      : db.evidence.count({ where: { submitterId: user.id, status: "REJECTED" } }),
     db.task.count({ where: { assigneeId: user.id, status: { in: ["TODO", "IN_PROGRESS", "REVISION"] } } }),
   ]);
 

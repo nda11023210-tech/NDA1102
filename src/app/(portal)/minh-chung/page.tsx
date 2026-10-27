@@ -26,7 +26,7 @@ export default async function CampaignsPage() {
     <>
       <PageHeader
         title="Cổng nộp minh chứng"
-        description="Các đợt thu thập minh chứng theo yêu cầu của Sở, Ban, Ngành. Minh chứng được duyệt tự động qua 2 cấp: Trợ lý khoa → Trưởng khoa, toàn bộ lịch sử được lưu để xuất báo cáo."
+        description="Các đợt thu thập minh chứng theo yêu cầu của Sở, Ban, Ngành. Minh chứng do Quản lý khoa phê duyệt; mỗi quyết định ghi rõ người duyệt, thời gian và được lưu cố định để xuất báo cáo."
       />
 
       {manager && (

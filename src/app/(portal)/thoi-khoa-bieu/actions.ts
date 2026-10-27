@@ -13,7 +13,7 @@ const refresh = () => revalidatePath("/thoi-khoa-bieu", "layout");
 export async function generateTimetable(_: ActionState, fd: FormData): Promise<ActionState> {
   let newId = "";
   const res = await attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const keepFrom = str(fd, "keepLockedFrom") || undefined;
     const result = await runScheduler(keepFrom);
     if (!result.ok) return fail(result.errors.join(" "));
@@ -36,7 +36,7 @@ export async function generateTimetable(_: ActionState, fd: FormData): Promise<A
 }
 
 export async function publishTimetable(fd: FormData) {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   const id = str(fd, "id");
   await db.$transaction([
     db.timetable.updateMany({ where: { status: "PUBLISHED" }, data: { status: "DRAFT" } }),
@@ -46,7 +46,7 @@ export async function publishTimetable(fd: FormData) {
 }
 
 export async function deleteTimetable(fd: FormData) {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   await db.timetable.delete({ where: { id: str(fd, "id") } });
   refresh();
   redirect("/thoi-khoa-bieu");
@@ -55,7 +55,7 @@ export async function deleteTimetable(fd: FormData) {
 /** Di chuyển một buổi sang ô khác (chỉnh tay). Tự chọn phòng trống đúng loại nếu không chỉ định. */
 export async function moveEntry(entryId: string, day: number, slot: number, roomId?: string): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     if (day < 0 || day > 4 || slot < 0 || slot > 1) return fail("Ô thời gian không hợp lệ.");
     const entry = await db.timetableEntry.findUniqueOrThrow({ where: { id: entryId }, include: { assignment: { include: { subject: true } } } });
     let targetRoom = roomId;
@@ -77,7 +77,7 @@ export async function moveEntry(entryId: string, day: number, slot: number, room
 
 export async function toggleLock(entryId: string): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const e = await db.timetableEntry.findUniqueOrThrow({ where: { id: entryId } });
     await db.timetableEntry.update({ where: { id: entryId }, data: { locked: !e.locked } });
     refresh();
@@ -89,7 +89,7 @@ export async function toggleLock(entryId: string): Promise<ActionState> {
 
 export async function saveRoom(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const code = str(fd, "code").toUpperCase();
     const type = str(fd, "type");
     if (!code || !["LAB", "THEORY"].includes(type)) return fail("Vui lòng nhập mã phòng và loại phòng.");
@@ -105,7 +105,7 @@ export async function saveRoom(_: ActionState, fd: FormData): Promise<ActionStat
 
 export async function saveClassGroup(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const code = str(fd, "code").toUpperCase();
     if (!code) return fail("Vui lòng nhập mã lớp.");
     await db.classGroup.upsert({
@@ -120,7 +120,7 @@ export async function saveClassGroup(_: ActionState, fd: FormData): Promise<Acti
 
 export async function saveSubject(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const code = str(fd, "code").toUpperCase();
     const kind = str(fd, "kind");
     const name = str(fd, "name");
@@ -137,7 +137,7 @@ export async function saveSubject(_: ActionState, fd: FormData): Promise<ActionS
 
 export async function createAssignment(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const lecturerId = str(fd, "lecturerId");
     const classGroupId = str(fd, "classGroupId");
     const subjectId = str(fd, "subjectId");
@@ -151,13 +151,13 @@ export async function createAssignment(_: ActionState, fd: FormData): Promise<Ac
 }
 
 export async function deleteAssignment(fd: FormData) {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   await db.teachingAssignment.delete({ where: { id: str(fd, "id") } });
   refresh();
 }
 
 export async function updateAssignmentSessions(fd: FormData) {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   const n = Number(str(fd, "sessionsPerWeek"));
   if (n >= 1 && n <= 5) await db.teachingAssignment.update({ where: { id: str(fd, "id") }, data: { sessionsPerWeek: n } });
   refresh();

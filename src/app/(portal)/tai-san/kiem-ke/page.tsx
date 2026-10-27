@@ -77,7 +77,7 @@ export default async function InventoryPage() {
           )}
           {!manager && (
             <Card>
-              <p className="text-sm text-ink-muted">Kiểm kê do Trợ lý khoa và Trưởng khoa thực hiện. Bạn có thể xem kết quả các đợt kiểm kê tại đây.</p>
+              <p className="text-sm text-ink-muted">Kiểm kê do Quản lý khoa thực hiện. Bạn có thể xem kết quả các đợt kiểm kê tại đây.</p>
             </Card>
           )}
         </div>

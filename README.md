@@ -9,12 +9,12 @@ Xây dựng bằng **Next.js 15 (Node.js) + Tailwind CSS 4 + Prisma + MySQL**, t
 |---|---|
 | **1. Văn bản & Thông báo** | Đăng văn bản theo danh mục (Công văn, Thông báo, Quyết định…), đính kèm tệp, ký nhận điện tử (gõ họ tên + lưu thời gian, IP), theo dõi tỷ lệ đã đọc/đã ký của từng người. |
 | **2. Tài sản & Thiết bị** | Danh mục tài sản, trạng thái sử dụng, đăng ký mượn – duyệt – trả, in tem QR, kiểm kê định kỳ bằng cách quét QR (camera điện thoại hoặc trình quét trong trang). |
-| **3. Minh chứng Sở ban ngành** | Tạo đợt minh chứng theo tiêu chí, giảng viên nộp kèm tệp, duyệt tự động 2 cấp (Trợ lý → Trưởng khoa), trả hồ sơ/nộp lại, lưu lịch sử, xuất báo cáo Excel (CSV). |
+| **3. Minh chứng Sở ban ngành** | Tạo đợt minh chứng theo tiêu chí, giảng viên nộp kèm tệp, Quản lý khoa phê duyệt một lần (ghi tên người duyệt, lịch sử không thể sửa), trả hồ sơ/nộp lại, xuất báo cáo Excel (CSV). |
 | **4. Thời khóa biểu thông minh** | Thuật toán CSP (quay lui + MRV + forward checking): mỗi GV đúng 5 buổi/tuần, không trùng GV/lớp/phòng, MĐ 6 giờ ở phòng thực hành, MH 5 giờ ở phòng lý thuyết. Chỉnh tay bằng kéo-thả, khóa buổi, xếp lại giữ buổi đã khóa, phát hiện xung đột, công bố phiên bản. |
 | **5. Giao việc & Hiệu suất** | Giao việc có hạn chót, tiêu chí nghiệm thu, khối lượng; nộp kết quả, nghiệm thu chấm sao. Chấm điểm tự động: Tiến độ 40% · Khối lượng 30% · Chất lượng 30%, biểu đồ, nhận xét do AI viết. |
 | **6. Trợ lý AI & Kho tri thức** | Kho quy chế/quy trình; chatbot tra cứu 24/7 (RAG: tìm kiếm BM25 không dấu → Claude trả lời kèm nguồn). Không có API key vẫn chạy ở chế độ tra cứu nhanh. |
 
-**Vai trò:** Quản trị viên · Trưởng khoa · Trợ lý khoa · Giảng viên.
+**Vai trò:** Quản trị viên · Quản lý khoa · Giảng viên.
 
 ## Chạy thử trên máy (không cần MySQL)
 
@@ -39,8 +39,7 @@ Mở http://localhost:3000 và đăng nhập (mật khẩu mặc định `Kcntt@
 | Vai trò | Email |
 |---|---|
 | Quản trị viên | admin@cntt.bnic.edu.vn |
-| Trưởng khoa | truongkhoa@cntt.bnic.edu.vn |
-| Trợ lý khoa | troly1@cntt.bnic.edu.vn |
+| Quản lý khoa | truongkhoa@cntt.bnic.edu.vn, troly1@cntt.bnic.edu.vn, troly2@cntt.bnic.edu.vn |
 | Giảng viên | gv.anh@cntt.bnic.edu.vn |
 
 > ⚠️ Dữ liệu mẫu (tên người, văn bản, quy chế) là **giả lập**. Hãy đổi mật khẩu/xóa tài khoản mẫu và thay nội dung thật trước khi dùng chính thức.
@@ -113,6 +112,16 @@ Gắn tên miền cho ứng dụng trong hPanel và bật SSL miễn phí. Cooki
 ### Cập nhật về sau
 
 Mỗi lần `git push` lên nhánh đã kết nối, Hostinger tự build và khởi động lại (nếu bật auto-deploy), hoặc bấm **Redeploy** trong hPanel.
+
+## Nâng cấp từ bản có vai trò Trưởng khoa / Trợ lý khoa
+
+Nếu CSDL đã tạo trước khi gộp vai trò, chạy một lần (qua SSH trên Hostinger, hoặc trên máy):
+
+```bash
+npx tsx scripts/migrate-roles.ts
+```
+
+Lệnh chuyển các tài khoản Trưởng khoa/Trợ lý khoa thành Quản lý khoa. Lịch sử duyệt minh chứng cũ được giữ nguyên.
 
 ## Thay logo & màu nhận diện
 

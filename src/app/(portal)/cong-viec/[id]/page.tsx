@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { CheckSquare, Play, Send, Star, RotateCcw, CheckCircle2 } from "lucide-react";
-import { requireUser } from "@/lib/auth";
+import { isManager, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { TASK_PRIORITY, TASK_STATUS } from "@/lib/constants";
 import { taskTimeliness } from "@/lib/performance";
@@ -25,8 +25,8 @@ export default async function TaskDetail({ params }: { params: Promise<{ id: str
   });
   if (!task) notFound();
   const isAssignee = task.assigneeId === user.id;
-  const isReviewer = task.assignerId === user.id || ["ADMIN", "HEAD"].includes(user.role);
-  if (!isAssignee && !isReviewer && user.role !== "ASSISTANT") notFound();
+  const isReviewer = task.assignerId === user.id || isManager(user);
+  if (!isAssignee && !isReviewer) notFound();
 
   const criteria = (task.criteria ?? "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   const now = new Date();

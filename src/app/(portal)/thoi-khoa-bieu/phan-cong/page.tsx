@@ -11,9 +11,9 @@ import { createAssignment, deleteAssignment, saveClassGroup, saveRoom, saveSubje
 export const metadata = { title: "Phân công giảng dạy" };
 
 export default async function AssignmentsPage() {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   const [lecturers, classes, subjects, rooms, assignments] = await Promise.all([
-    db.user.findMany({ where: { active: true, role: { in: ["LECTURER", "HEAD", "ASSISTANT"] } }, orderBy: { name: "asc" } }),
+    db.user.findMany({ where: { active: true, role: { not: "ADMIN" } }, orderBy: { name: "asc" } }),
     db.classGroup.findMany({ orderBy: { code: "asc" }, include: { assignments: { select: { sessionsPerWeek: true } } } }),
     db.subject.findMany({ orderBy: { code: "asc" } }),
     db.room.findMany({ orderBy: [{ type: "asc" }, { code: "asc" }] }),

@@ -2,15 +2,20 @@ export const FACULTY_NAME = "Khoa Công nghệ Thông tin";
 export const SCHOOL_NAME = "Trường Cao đẳng Công nghiệp Bắc Ninh";
 export const APP_NAME = "Cổng quản trị Khoa CNTT";
 
-export const ROLES = ["ADMIN", "HEAD", "ASSISTANT", "LECTURER"] as const;
+export const ROLES = ["ADMIN", "MANAGER", "LECTURER"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Quản trị viên",
-  HEAD: "Trưởng khoa",
-  ASSISTANT: "Trợ lý khoa",
+  MANAGER: "Quản lý khoa",
   LECTURER: "Giảng viên",
 };
+
+/** Quy đổi vai trò cũ (Trưởng khoa/Trợ lý khoa trước khi gộp) về vai trò hiện hành */
+export function normalizeRole(role: string): Role {
+  if (role === "HEAD" || role === "ASSISTANT") return "MANAGER";
+  return (ROLES as readonly string[]).includes(role) ? (role as Role) : "LECTURER";
+}
 
 export const ASSET_CATEGORY: Record<string, string> = {
   LAB: "Phòng thực hành",
@@ -43,8 +48,9 @@ export const INVENTORY_CONDITION: Record<string, { label: string; tone: Tone }> 
 };
 
 export const EVIDENCE_STATUS: Record<string, { label: string; tone: Tone }> = {
-  SUBMITTED: { label: "Chờ Trợ lý duyệt", tone: "amber" },
-  ASSISTANT_APPROVED: { label: "Chờ Trưởng khoa duyệt", tone: "blue" },
+  SUBMITTED: { label: "Chờ duyệt", tone: "amber" },
+  // Trạng thái của quy trình 2 cấp cũ – vẫn được coi là chờ duyệt
+  ASSISTANT_APPROVED: { label: "Chờ duyệt", tone: "amber" },
   APPROVED: { label: "Đã phê duyệt", tone: "green" },
   REJECTED: { label: "Yêu cầu bổ sung", tone: "red" },
 };
@@ -52,8 +58,10 @@ export const EVIDENCE_STATUS: Record<string, { label: string; tone: Tone }> = {
 export const EVIDENCE_ACTION: Record<string, string> = {
   SUBMIT: "Nộp minh chứng",
   RESUBMIT: "Nộp lại sau bổ sung",
-  APPROVE_L1: "Trợ lý khoa duyệt",
-  APPROVE_L2: "Trưởng khoa phê duyệt",
+  APPROVE: "Quản lý khoa phê duyệt",
+  // Hành động của quy trình 2 cấp cũ (giữ để hiển thị lịch sử)
+  APPROVE_L1: "Duyệt cấp 1 (quy trình cũ)",
+  APPROVE_L2: "Phê duyệt cấp 2 (quy trình cũ)",
   REJECT: "Yêu cầu bổ sung",
 };
 

@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "./db";
-import type { Role } from "./constants";
+import { normalizeRole, type Role } from "./constants";
 import { SESSION_COOKIE, verifySession } from "./session";
 
 /** Người dùng hiện tại (đọc lại từ CSDL để vai trò/trạng thái luôn mới nhất) */
@@ -16,7 +16,7 @@ export const getCurrentUser = cache(async () => {
     select: { id: true, name: true, email: true, role: true, title: true, active: true },
   });
   if (!user || !user.active) return null;
-  return { ...user, role: user.role as Role };
+  return { ...user, role: normalizeRole(user.role) };
 });
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
@@ -38,5 +38,5 @@ export function hasRole(user: { role: Role }, ...roles: Role[]) {
   return user.role === "ADMIN" || roles.includes(user.role);
 }
 
-/** Quản lý (Trưởng khoa, Trợ lý, Admin) */
-export const isManager = (user: { role: Role }) => hasRole(user, "HEAD", "ASSISTANT");
+/** Quản lý khoa (hoặc Quản trị viên) */
+export const isManager = (user: { role: Role }) => hasRole(user, "MANAGER");

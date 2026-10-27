@@ -2,14 +2,13 @@ import { Inbox } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canReviewEvidence, reviewQueueStatuses } from "@/lib/permissions";
-import { ROLE_LABEL } from "@/lib/constants";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { EvidenceItem, evidenceInclude } from "../evidence-item";
 
 export const metadata = { title: "Hàng chờ duyệt minh chứng" };
 
 export default async function ReviewQueue() {
-  const user = await requireRole("HEAD", "ASSISTANT");
+  const user = await requireRole("MANAGER");
   const evidences = await db.evidence.findMany({
     where: { status: { in: reviewQueueStatuses(user) } },
     include: evidenceInclude,
@@ -20,7 +19,7 @@ export default async function ReviewQueue() {
     <>
       <PageHeader
         title="Hàng chờ duyệt"
-        description={`Hồ sơ đang chờ ${ROLE_LABEL[user.role]} xử lý. Duyệt xong, hồ sơ tự động chuyển sang bước tiếp theo; trả hồ sơ sẽ thông báo cho giảng viên bổ sung.`}
+        description="Hồ sơ đang chờ Quản lý khoa phê duyệt. Một lần duyệt là hoàn tất; trả hồ sơ thì giảng viên bổ sung và nộp lại. Tên người duyệt được ghi vào lịch sử, không thể sửa."
       />
       <Card bodyClassName="divide-y divide-line">
         {evidences.length === 0 ? (

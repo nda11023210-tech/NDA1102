@@ -1,4 +1,4 @@
-import { Check, CornerUpLeft, Send } from "lucide-react";
+import { Check, CornerUpLeft, Lock, Send } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { EVIDENCE_ACTION, EVIDENCE_STATUS } from "@/lib/constants";
 import { cn, fmtDateTime } from "@/lib/utils";
@@ -16,30 +16,11 @@ export const evidenceInclude = {
 
 export type EvidenceWithRelations = Prisma.EvidenceGetPayload<{ include: typeof evidenceInclude }>;
 
-const STEPS = [
-  { key: "SUBMITTED", label: "Nộp" },
-  { key: "ASSISTANT_APPROVED", label: "Trợ lý duyệt" },
-  { key: "APPROVED", label: "Trưởng khoa duyệt" },
-];
+const APPROVE_ACTIONS = ["APPROVE", "APPROVE_L2"];
 
-function Stepper({ status }: { status: string }) {
-  const idx = status === "APPROVED" ? 3 : status === "ASSISTANT_APPROVED" ? 2 : 1;
-  const rejected = status === "REJECTED";
-  return (
-    <ol className="flex items-center gap-1.5 text-xs" aria-label="Tiến trình duyệt">
-      {STEPS.map((s, i) => {
-        const done = !rejected && i < idx;
-        return (
-          <li key={s.key} className="flex items-center gap-1.5">
-            {i > 0 && <span aria-hidden className={cn("h-px w-4", done ? "bg-emerald-400" : "bg-slate-300")} />}
-            <span className={cn("rounded-full px-2 py-0.5 font-medium", done ? "bg-emerald-50 text-emerald-700" : rejected && i === 0 ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-500")}>
-              {s.label}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
+/** Người và thời điểm ra quyết định cuối cùng (phê duyệt hoặc trả hồ sơ) */
+function lastDecision(ev: EvidenceWithRelations) {
+  return [...ev.logs].reverse().find((l) => APPROVE_ACTIONS.includes(l.action) || l.action === "REJECT");
 }
 
 export function EvidenceItem({
@@ -76,12 +57,26 @@ export function EvidenceItem({
         </div>
         <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
           <StatusBadge map={EVIDENCE_STATUS} value={ev.status} />
-          <Stepper status={ev.status} />
+          {(() => {
+            const d = ev.status === "APPROVED" || ev.status === "REJECTED" ? lastDecision(ev) : undefined;
+            return (
+              d && (
+                <p className="text-xs text-ink-muted lg:text-right">
+                  {ev.status === "APPROVED" ? "Người duyệt" : "Người trả hồ sơ"}: <span className="font-semibold text-ink-soft">{d.actor.name}</span>
+                  <br />
+                  {fmtDateTime(d.createdAt)}
+                </p>
+              )
+            );
+          })()}
         </div>
       </div>
 
       <details className="group mt-3">
         <summary className="cursor-pointer text-sm font-medium text-action select-none">Lịch sử xử lý ({ev.logs.length})</summary>
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-muted">
+          <Lock className="size-3.5" aria-hidden /> Lịch sử duyệt được lưu cố định, không thể sửa hoặc xóa.
+        </p>
         <ol className="mt-3 space-y-3 border-l-2 border-line pl-4">
           {ev.logs.map((l) => (
             <li key={l.id} className="relative text-sm">

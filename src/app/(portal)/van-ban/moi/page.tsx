@@ -9,7 +9,7 @@ import { SignToggle } from "./sign-toggle";
 export const metadata = { title: "Đăng văn bản" };
 
 export default async function NewDocumentPage() {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   const categories = await db.docCategory.findMany({ orderBy: { name: "asc" } });
   const now = toLocalInput(new Date()).slice(0, 10);
 

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { attempt, fail, ok, type ActionState } from "@/lib/action-state";
-import { ROLES, ROLE_LABEL, type Role } from "@/lib/constants";
+import { ROLES, ROLE_LABEL, normalizeRole, type Role } from "@/lib/constants";
 import { str } from "@/lib/utils";
 import { Avatar, Badge, Card, Field, PageHeader } from "@/components/ui";
 import { ActionForm, Disclosure, SubmitButton } from "@/components/forms";
@@ -50,11 +50,11 @@ async function updateUser(fd: FormData) {
 
 export default async function UsersPage() {
   const me = await requireRole("ADMIN");
-  const users = await db.user.findMany({ orderBy: [{ role: "asc" }, { name: "asc" }] });
+  const users = await db.user.findMany({ orderBy: [{ name: "asc" }] });
 
   return (
     <>
-      <PageHeader title="Người dùng" description={`${users.length} tài khoản. Phân quyền theo vai trò: Quản trị viên, Trưởng khoa, Trợ lý khoa, Giảng viên.`} />
+      <PageHeader title="Người dùng" description={`${users.length} tài khoản. Phân quyền theo vai trò: Quản trị viên, Quản lý khoa, Giảng viên.`} />
 
       <Disclosure summary="Thêm tài khoản mới" className="mb-6">
         <ActionForm action={createUser} className="grid gap-4 space-y-0 sm:grid-cols-2 lg:grid-cols-3">
@@ -121,7 +121,7 @@ export default async function UsersPage() {
                       <label className="sr-only" htmlFor={`role-${u.id}`}>
                         Vai trò của {u.name}
                       </label>
-                      <select id={`role-${u.id}`} name="role" defaultValue={u.role} className="input min-h-8 w-40 py-1" disabled={u.id === me.id}>
+                      <select id={`role-${u.id}`} name="role" defaultValue={normalizeRole(u.role)} className="input min-h-8 w-40 py-1" disabled={u.id === me.id}>
                         {ROLES.map((r) => (
                           <option key={r} value={r}>
                             {ROLE_LABEL[r]}

@@ -70,7 +70,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
     <>
       <PageHeader
         title={all ? "Hiệu suất giảng viên" : "Hiệu suất của tôi"}
-        description={`Chấm điểm tự động theo trọng số: Tiến độ ${WEIGHTS.timeliness * 100}% · Khối lượng ${WEIGHTS.workload * 100}% · Chất lượng nghiệm thu ${WEIGHTS.quality * 100}%. AI hỗ trợ viết nhận xét, kết luận cuối cùng thuộc về Trưởng khoa.`}
+        description={`Chấm điểm tự động theo trọng số: Tiến độ ${WEIGHTS.timeliness * 100}% · Khối lượng ${WEIGHTS.workload * 100}% · Chất lượng nghiệm thu ${WEIGHTS.quality * 100}%. AI hỗ trợ viết nhận xét, kết luận cuối cùng thuộc về Quản lý khoa.`}
         actions={
           <nav aria-label="Kỳ đánh giá" className="inline-flex gap-1 rounded-xl bg-slate-200/60 p-1">
             {PERIODS.map((d) => (

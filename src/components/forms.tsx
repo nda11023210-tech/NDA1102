@@ -27,14 +27,29 @@ export function SubmitButton({
   return (
     <button
       type="submit"
-      name={name}
-      value={value}
       className={className}
       disabled={pending}
       aria-busy={pending}
       formAction={formAction}
       onClick={(e) => {
-        if (confirm && !window.confirm(confirm)) e.preventDefault();
+        if (confirm && !window.confirm(confirm)) {
+          e.preventDefault();
+          return;
+        }
+        // Ghi giá trị của nút vào ô ẩn: form action của React không phải lúc nào cũng gửi kèm nút đã bấm,
+        // nên các form có nhiều nút (Duyệt / Trả hồ sơ…) cần cách này để server biết lựa chọn.
+        const form = e.currentTarget.form;
+        if (form && name) {
+          let input = form.querySelector<HTMLInputElement>(`input[type="hidden"][data-submitter="${name}"]`);
+          if (!input) {
+            input = document.createElement("input");
+            input.type = "hidden";
+            input.name = name;
+            input.dataset.submitter = name;
+            form.appendChild(input);
+          }
+          input.value = value ?? "";
+        }
       }}
     >
       {pending ? (

@@ -1,6 +1,6 @@
 // Ký/xác minh JWT phiên đăng nhập – dùng được cả ở middleware (Edge) và server.
 import { SignJWT, jwtVerify } from "jose";
-import type { Role } from "./constants";
+import { normalizeRole, type Role } from "./constants";
 
 export const SESSION_COOKIE = "kcntt_session";
 export const SESSION_MAX_AGE = 60 * 60 * 12; // 12 giờ
@@ -29,7 +29,7 @@ export async function verifySession(token: string | undefined): Promise<SessionP
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    return { sub: payload.sub as string, name: payload.name as string, role: payload.role as Role };
+    return { sub: payload.sub as string, name: payload.name as string, role: normalizeRole(String(payload.role)) };
   } catch {
     return null;
   }

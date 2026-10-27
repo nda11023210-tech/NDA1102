@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, PenLine, Trash2, Eye } from "lucide-react";
 import { requireUser, isManager } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fmtDate, fmtDateTime, fmtRelative } from "@/lib/utils";
-import { ROLE_LABEL, type Role, type Tone } from "@/lib/constants";
+import { ROLE_LABEL, normalizeRole, type Tone } from "@/lib/constants";
 import { AttachmentList, Avatar, Badge, Card, PageHeader, ProgressBar } from "@/components/ui";
 import { SubmitButton } from "@/components/forms";
 import { deleteDocument } from "../actions";
@@ -129,7 +129,7 @@ export default async function DocumentDetail({ params }: { params: Promise<{ id:
                               <Avatar name={u.name} size="sm" />
                               <div>
                                 <div className="font-medium">{u.name}</div>
-                                <div className="text-xs text-ink-muted">{ROLE_LABEL[u.role as Role]}</div>
+                                <div className="text-xs text-ink-muted">{ROLE_LABEL[normalizeRole(u.role)]}</div>
                               </div>
                             </div>
                           </td>

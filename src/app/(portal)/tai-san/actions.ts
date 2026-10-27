@@ -14,7 +14,7 @@ const refresh = (code?: string) => {
 
 export async function createAsset(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const code = str(fd, "code").toUpperCase();
     const name = str(fd, "name");
     const category = str(fd, "category");
@@ -41,7 +41,7 @@ export async function createAsset(_: ActionState, fd: FormData): Promise<ActionS
 
 export async function updateAsset(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const id = str(fd, "id");
     const status = str(fd, "status");
     if (!ASSET_STATUS[status]) return fail("Trạng thái không hợp lệ.");
@@ -71,12 +71,12 @@ export async function requestLoan(_: ActionState, fd: FormData): Promise<ActionS
     if (overlap) return fail("Đã có yêu cầu mượn trùng khoảng thời gian này.");
     await db.assetLoan.create({ data: { assetId, borrowerId: user.id, purpose, startAt, dueAt } });
     refresh(asset.code);
-    return ok("Đã gửi yêu cầu mượn. Trợ lý khoa sẽ duyệt sớm.");
+    return ok("Đã gửi yêu cầu mượn. Quản lý khoa sẽ duyệt sớm.");
   });
 }
 
 export async function decideLoan(fd: FormData) {
-  const user = await requireRole("HEAD", "ASSISTANT");
+  const user = await requireRole("MANAGER");
   const id = str(fd, "id");
   const decision = str(fd, "decision");
   const loan = await db.assetLoan.findUniqueOrThrow({ where: { id }, include: { asset: true } });
@@ -102,7 +102,7 @@ export async function decideLoan(fd: FormData) {
 
 export async function createInventoryCheck(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    const user = await requireRole("HEAD", "ASSISTANT");
+    const user = await requireRole("MANAGER");
     const name = str(fd, "name");
     if (!name) return fail("Vui lòng nhập tên đợt kiểm kê.");
     if (await db.inventoryCheck.findFirst({ where: { closedAt: null } })) return fail("Đang có một đợt kiểm kê chưa kết thúc.");
@@ -114,7 +114,7 @@ export async function createInventoryCheck(_: ActionState, fd: FormData): Promis
 
 export async function recordInventory(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    const user = await requireRole("HEAD", "ASSISTANT");
+    const user = await requireRole("MANAGER");
     const checkId = str(fd, "checkId");
     const assetId = str(fd, "assetId");
     const condition = str(fd, "condition");
@@ -136,7 +136,7 @@ export async function recordInventory(_: ActionState, fd: FormData): Promise<Act
 }
 
 export async function closeInventoryCheck(fd: FormData) {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   const id = str(fd, "id");
   await db.inventoryCheck.update({ where: { id }, data: { closedAt: new Date() } });
   refresh();

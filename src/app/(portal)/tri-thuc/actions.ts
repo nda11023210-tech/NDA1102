@@ -10,7 +10,7 @@ import { str } from "@/lib/utils";
 export async function saveArticle(_: ActionState, fd: FormData): Promise<ActionState> {
   let id = str(fd, "id");
   const res = await attempt(async () => {
-    const user = await requireRole("HEAD", "ASSISTANT");
+    const user = await requireRole("MANAGER");
     const title = str(fd, "title");
     const category = str(fd, "category");
     const content = str(fd, "content");
@@ -28,7 +28,7 @@ export async function saveArticle(_: ActionState, fd: FormData): Promise<ActionS
 }
 
 export async function deleteArticle(fd: FormData) {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   await db.kbArticle.delete({ where: { id: str(fd, "id") } });
   revalidatePath("/tri-thuc", "layout");
   redirect("/tri-thuc");

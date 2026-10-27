@@ -10,7 +10,7 @@ export const metadata = { title: "Đăng nhập" };
 const FEATURES = [
   { icon: FileCheck2, text: "Văn bản điện tử & ký nhận" },
   { icon: Boxes, text: "Tài sản, mượn trả, kiểm kê QR" },
-  { icon: ClipboardCheck, text: "Minh chứng duyệt 2 cấp" },
+  { icon: ClipboardCheck, text: "Nộp & duyệt minh chứng" },
   { icon: CalendarRange, text: "Xếp thời khóa biểu tự động" },
   { icon: BarChart3, text: "Giao việc & đánh giá hiệu suất" },
   { icon: Bot, text: "Trợ lý AI tra cứu quy chế 24/7" },
@@ -78,7 +78,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p className="mt-1 text-sm text-ink-muted">Sử dụng tài khoản do Khoa cấp để truy cập hệ thống.</p>
           <LoginForm next={next ?? ""} />
           <p className="mt-8 text-center text-xs text-ink-muted">
-            Quên mật khẩu? Liên hệ Trợ lý khoa hoặc Quản trị viên để được cấp lại.
+            Quên mật khẩu? Liên hệ Quản lý khoa hoặc Quản trị viên để được cấp lại.
           </p>
         </div>
       </section>

@@ -6,7 +6,7 @@ import { ArticleForm } from "../article-form";
 export const metadata = { title: "Thêm bài viết" };
 
 export default async function NewArticle() {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   const cats = await db.kbArticle.findMany({ distinct: ["category"], select: { category: true } });
   return (
     <>

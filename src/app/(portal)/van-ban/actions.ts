@@ -12,7 +12,7 @@ import { fromLocalInput, normalizeVi, str } from "@/lib/utils";
 export async function createDocument(_: ActionState, fd: FormData): Promise<ActionState> {
   let id = "";
   const res = await attempt(async () => {
-    const user = await requireRole("HEAD", "ASSISTANT");
+    const user = await requireRole("MANAGER");
     const title = str(fd, "title");
     const categoryId = str(fd, "categoryId");
     if (!title || !categoryId) return fail("Vui lòng nhập tiêu đề và chọn danh mục.");
@@ -66,7 +66,7 @@ export async function signDocument(_: ActionState, fd: FormData): Promise<Action
 }
 
 export async function deleteDocument(fd: FormData) {
-  await requireRole("HEAD", "ASSISTANT");
+  await requireRole("MANAGER");
   const id = str(fd, "id");
   const files = await db.attachment.findMany({ where: { documentId: id } });
   await db.document.delete({ where: { id } });
@@ -77,7 +77,7 @@ export async function deleteDocument(fd: FormData) {
 
 export async function createCategory(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("HEAD", "ASSISTANT");
+    await requireRole("MANAGER");
     const name = str(fd, "name");
     if (!name) return fail("Vui lòng nhập tên danh mục.");
     const slug = normalizeVi(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

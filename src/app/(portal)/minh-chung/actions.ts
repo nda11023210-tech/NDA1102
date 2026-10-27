@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { hasRole, requireRole, requireUser } from "@/lib/auth";
+import { requireRole, requireUser } from "@/lib/auth";
+import { PENDING_EVIDENCE } from "@/lib/permissions";
 import { attempt, fail, ok, type ActionState } from "@/lib/action-state";
 import { saveUploads } from "@/lib/uploads";
 import { fromLocalInput, str } from "@/lib/utils";
@@ -25,7 +26,7 @@ function parseCriteria(text: string) {
 export async function createCampaign(_: ActionState, fd: FormData): Promise<ActionState> {
   let id = "";
   const res = await attempt(async () => {
-    const user = await requireRole("HEAD", "ASSISTANT");
+    const user = await requireRole("MANAGER");
     const title = str(fd, "title");
     const agency = str(fd, "agency");
     const openAt = fromLocalInput(str(fd, "openAt"));
@@ -70,45 +71,36 @@ export async function submitEvidence(_: ActionState, fd: FormData): Promise<Acti
     });
     await saveUploads(fd, user.id, { evidenceId: ev.id });
     refresh();
-    return ok("Đã nộp minh chứng. Hồ sơ được chuyển tự động tới Trợ lý khoa để duyệt cấp 1.");
+    return ok("Đã nộp minh chứng. Hồ sơ đã được chuyển tới Quản lý khoa để duyệt.");
   });
 }
 
 /**
- * Duyệt minh chứng theo luồng tự động:
- * SUBMITTED --(Trợ lý)--> ASSISTANT_APPROVED --(Trưởng khoa)--> APPROVED
- * Bất kỳ cấp nào cũng có thể trả về REJECTED kèm yêu cầu bổ sung.
+ * Duyệt minh chứng (1 cấp): SUBMITTED --(Quản lý khoa)--> APPROVED hoặc REJECTED.
+ * Mỗi quyết định ghi một dòng EvidenceLog gồm người duyệt, thời điểm, ý kiến.
+ * Lịch sử chỉ được THÊM, không có thao tác sửa/xóa log ở bất kỳ đâu trong hệ thống;
+ * hồ sơ đã phê duyệt cũng không thể nộp lại hay chỉnh sửa.
  */
 export async function reviewEvidence(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    const user = await requireRole("HEAD", "ASSISTANT");
+    const user = await requireRole("MANAGER");
     const id = str(fd, "id");
     const decision = str(fd, "decision");
     const comment = str(fd, "comment") || null;
-    const ev = await db.evidence.findUniqueOrThrow({ where: { id } });
+    if (decision === "reject" && !comment) return fail("Vui lòng ghi rõ nội dung cần bổ sung khi trả hồ sơ.");
+    if (decision !== "approve" && decision !== "reject") return fail("Thao tác không hợp lệ.");
 
-    if (decision === "reject") {
-      if (!comment) return fail("Vui lòng ghi rõ nội dung cần bổ sung khi trả hồ sơ.");
-      if (!["SUBMITTED", "ASSISTANT_APPROVED"].includes(ev.status)) return fail("Hồ sơ không ở trạng thái chờ duyệt.");
-      await db.evidence.update({ where: { id }, data: { status: "REJECTED", logs: { create: { actorId: user.id, action: "REJECT", comment } } } });
-      refresh();
-      return ok("Đã trả hồ sơ, yêu cầu giảng viên bổ sung.");
-    }
-
-    if (ev.status === "SUBMITTED" && hasRole(user, "ASSISTANT")) {
-      await db.evidence.update({
-        where: { id },
-        data: { status: "ASSISTANT_APPROVED", logs: { create: { actorId: user.id, action: "APPROVE_L1", comment } } },
-      });
-      refresh();
-      return ok("Đã duyệt cấp 1. Hồ sơ được chuyển tự động lên Trưởng khoa.");
-    }
-    if (ev.status === "ASSISTANT_APPROVED" && hasRole(user, "HEAD")) {
-      await db.evidence.update({ where: { id }, data: { status: "APPROVED", logs: { create: { actorId: user.id, action: "APPROVE_L2", comment } } } });
-      refresh();
-      return ok("Đã phê duyệt minh chứng.");
-    }
-    return fail("Bạn không có quyền duyệt hồ sơ ở bước này.");
+    // Cập nhật có điều kiện trạng thái: tránh hai người cùng duyệt một hồ sơ
+    const status = decision === "approve" ? "APPROVED" : "REJECTED";
+    const done = await db.$transaction(async (tx) => {
+      const updated = await tx.evidence.updateMany({ where: { id, status: { in: PENDING_EVIDENCE } }, data: { status } });
+      if (updated.count === 0) return false;
+      await tx.evidenceLog.create({ data: { evidenceId: id, actorId: user.id, action: decision === "approve" ? "APPROVE" : "REJECT", comment } });
+      return true;
+    });
+    if (!done) return fail("Hồ sơ đã được người khác xử lý hoặc không còn ở trạng thái chờ duyệt.");
+    refresh();
+    return ok(decision === "approve" ? `Đã phê duyệt minh chứng (người duyệt: ${user.name}).` : "Đã trả hồ sơ, yêu cầu giảng viên bổ sung.");
   });
 }
 
