@@ -1,0 +1,25 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, verifySession } from "@/lib/session";
+
+const PUBLIC = ["/login", "/_next", "/favicon", "/logo", "/robots.txt"];
+
+export async function middleware(req: NextRequest) {
+  const { pathname, search } = req.nextUrl;
+  if (PUBLIC.some((p) => pathname.startsWith(p))) return NextResponse.next();
+
+  const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
+  if (!session) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    }
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname + search)}`;
+    return NextResponse.redirect(url);
+  }
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|.*\.(?:svg|png|jpg|ico|webp)$).*)"],
+};

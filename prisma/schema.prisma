@@ -1,0 +1,400 @@
+// Cổng quản trị nội bộ Khoa CNTT – Trường CĐ Công nghiệp Bắc Ninh
+// CSDL chính: MySQL (Hostinger). Khi chạy thử local không có MySQL,
+// `npm run local:sqlite` sẽ sinh bản SQLite từ chính file này.
+//
+// Các trường trạng thái/vai trò dùng String (không dùng enum) để tương thích cả hai CSDL.
+// Giá trị hợp lệ được khai báo trong src/lib/constants.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Người dùng ─────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("LECTURER") // ADMIN | HEAD | ASSISTANT | LECTURER
+  title        String? // Học hàm/học vị: ThS., TS., KS....
+  phone        String?
+  expertise    String? // Chuyên môn
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  documentsCreated  Document[]          @relation("DocumentCreator")
+  receipts          DocumentReceipt[]
+  attachments       Attachment[]
+  loans             AssetLoan[]         @relation("LoanBorrower")
+  loansApproved     AssetLoan[]         @relation("LoanApprover")
+  inventoryChecks   InventoryCheck[]
+  inventoryItems    InventoryItem[]
+  campaigns         EvidenceCampaign[]
+  evidences         Evidence[]
+  evidenceLogs      EvidenceLog[]
+  assignments       TeachingAssignment[]
+  tasksAssigned     Task[]              @relation("TaskAssignee")
+  tasksCreated      Task[]              @relation("TaskAssigner")
+  taskComments      TaskComment[]
+  kbArticles        KbArticle[]
+  chatLogs          ChatLog[]
+  performanceReviews PerformanceReview[]
+}
+
+// Tệp đính kèm dùng chung cho văn bản, minh chứng, công việc
+model Attachment {
+  id           String   @id @default(cuid())
+  fileName     String
+  storedName   String   @unique
+  mimeType     String
+  size         Int
+  uploadedById String
+  documentId   String?
+  evidenceId   String?
+  taskId       String?
+  createdAt    DateTime @default(now())
+
+  uploadedBy User      @relation(fields: [uploadedById], references: [id])
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  evidence   Evidence? @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  task       Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([evidenceId])
+  @@index([taskId])
+}
+
+// ───────────────────────── Module 1: Văn bản ─────────────────────────
+
+model DocCategory {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  color     String     @default("blue")
+  documents Document[]
+}
+
+model Document {
+  id          String    @id @default(cuid())
+  number      String? // Số hiệu: 125/TB-KCNTT
+  title       String
+  summary     String?   @db.Text
+  content     String?   @db.Text
+  categoryId  String
+  issuedAt    DateTime  @default(now())
+  requireSign Boolean   @default(false) // Bắt buộc ký nhận
+  signDueAt   DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  category    DocCategory       @relation(fields: [categoryId], references: [id])
+  createdBy   User              @relation("DocumentCreator", fields: [createdById], references: [id])
+  attachments Attachment[]
+  receipts    DocumentReceipt[]
+
+  @@index([categoryId])
+  @@index([issuedAt])
+}
+
+model DocumentReceipt {
+  id            String    @id @default(cuid())
+  documentId    String
+  userId        String
+  readAt        DateTime?
+  signedAt      DateTime?
+  signatureName String? // Họ tên người ký xác nhận
+  signatureIp   String?
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+}
+
+// ──────────────────── Module 2: Tài sản & Trang thiết bị ────────────────────
+
+model Asset {
+  id           String    @id @default(cuid())
+  code         String    @unique // Mã tài sản, in trên tem QR
+  name         String
+  category     String // LAB | PROJECTOR | COMPUTER | NETWORK | TEACHING | OTHER
+  location     String
+  status       String    @default("AVAILABLE") // AVAILABLE | BORROWED | MAINTENANCE | BROKEN | LIQUIDATED
+  serial       String?
+  purchaseDate DateTime?
+  value        Int? // Nguyên giá (VNĐ)
+  note         String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  loans          AssetLoan[]
+  inventoryItems InventoryItem[]
+
+  @@index([category])
+  @@index([status])
+}
+
+model AssetLoan {
+  id           String    @id @default(cuid())
+  assetId      String
+  borrowerId   String
+  purpose      String
+  startAt      DateTime
+  dueAt        DateTime
+  returnedAt   DateTime?
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED | RETURNED
+  approvedById String?
+  returnNote   String?
+  createdAt    DateTime  @default(now())
+
+  asset      Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  borrower   User  @relation("LoanBorrower", fields: [borrowerId], references: [id])
+  approvedBy User? @relation("LoanApprover", fields: [approvedById], references: [id])
+
+  @@index([status])
+}
+
+model InventoryCheck {
+  id          String    @id @default(cuid())
+  name        String
+  startedAt   DateTime  @default(now())
+  closedAt    DateTime?
+  createdById String
+
+  createdBy User            @relation(fields: [createdById], references: [id])
+  items     InventoryItem[]
+}
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  checkId     String
+  assetId     String
+  checkedById String
+  condition   String // GOOD | DAMAGED | MISSING
+  note        String?
+  checkedAt   DateTime @default(now())
+
+  check     InventoryCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  asset     Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  checkedBy User           @relation(fields: [checkedById], references: [id])
+
+  @@unique([checkId, assetId])
+}
+
+// ─────────────────── Module 3: Minh chứng Sở ban ngành ───────────────────
+
+model EvidenceCampaign {
+  id          String   @id @default(cuid())
+  title       String
+  agency      String // Sở/Ban/Ngành yêu cầu
+  description String?  @db.Text
+  openAt      DateTime
+  closeAt     DateTime
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy User                @relation(fields: [createdById], references: [id])
+  criteria  EvidenceCriterion[]
+  evidences Evidence[]
+}
+
+model EvidenceCriterion {
+  id          String  @id @default(cuid())
+  campaignId  String
+  code        String // TC1.1
+  title       String
+  description String? @db.Text
+  order       Int     @default(0)
+
+  campaign  EvidenceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  evidences Evidence[]
+}
+
+model Evidence {
+  id          String   @id @default(cuid())
+  campaignId  String
+  criterionId String
+  submitterId String
+  title       String
+  description String?  @db.Text
+  status      String   @default("SUBMITTED") // SUBMITTED | ASSISTANT_APPROVED | APPROVED | REJECTED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaign    EvidenceCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  criterion   EvidenceCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  submitter   User              @relation(fields: [submitterId], references: [id])
+  attachments Attachment[]
+  logs        EvidenceLog[]
+
+  @@index([status])
+}
+
+model EvidenceLog {
+  id         String   @id @default(cuid())
+  evidenceId String
+  actorId    String
+  action     String // SUBMIT | APPROVE_L1 | APPROVE_L2 | REJECT | RESUBMIT
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  actor    User     @relation(fields: [actorId], references: [id])
+}
+
+// ───────────────────── Module 4: Thời khóa biểu ─────────────────────
+
+model Room {
+  id       String @id @default(cuid())
+  code     String @unique
+  name     String
+  type     String // THEORY (phòng lý thuyết) | LAB (xưởng/phòng máy)
+  capacity Int    @default(40)
+
+  entries TimetableEntry[]
+}
+
+model ClassGroup {
+  id   String @id @default(cuid())
+  code String @unique
+  name String
+  size Int    @default(35)
+
+  assignments TeachingAssignment[]
+}
+
+model Subject {
+  id    String @id @default(cuid())
+  code  String @unique
+  name  String
+  kind  String // MD (Mô-đun, buổi 6 giờ) | MH (Môn học, buổi 5 giờ)
+  hours Int    @default(60) // Tổng số giờ chương trình
+
+  assignments TeachingAssignment[]
+}
+
+// Phân công giảng dạy: GV x Lớp x Học phần, số buổi/tuần
+model TeachingAssignment {
+  id              String @id @default(cuid())
+  lecturerId      String
+  classGroupId    String
+  subjectId       String
+  sessionsPerWeek Int    @default(1)
+
+  lecturer   User             @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+  classGroup ClassGroup       @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+  subject    Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  entries    TimetableEntry[]
+}
+
+model Timetable {
+  id        String   @id @default(cuid())
+  name      String
+  status    String   @default("DRAFT") // DRAFT | PUBLISHED
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries TimetableEntry[]
+}
+
+model TimetableEntry {
+  id           String  @id @default(cuid())
+  timetableId  String
+  assignmentId String
+  day          Int // 0 = Thứ 2 ... 4 = Thứ 6
+  slot         Int // 0 = Sáng, 1 = Chiều
+  roomId       String
+  locked       Boolean @default(false)
+
+  timetable  Timetable          @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  assignment TeachingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  room       Room               @relation(fields: [roomId], references: [id])
+
+  @@index([timetableId])
+}
+
+// ──────────────────── Module 5: Giao việc & Hiệu suất ────────────────────
+
+model Task {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?   @db.Text
+  criteria     String?   @db.Text // Tiêu chí nghiệm thu (mỗi dòng 1 tiêu chí)
+  assigneeId   String
+  assignerId   String
+  priority     String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  workload     Int       @default(2) // Khối lượng 1–5
+  dueAt        DateTime
+  status       String    @default("TODO") // TODO | IN_PROGRESS | SUBMITTED | REVISION | DONE
+  submittedAt  DateTime?
+  completedAt  DateTime?
+  qualityScore Int? // 1–5, người giao chấm khi nghiệm thu
+  reviewNote   String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  assignee    User          @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  assigner    User          @relation("TaskAssigner", fields: [assignerId], references: [id])
+  comments    TaskComment[]
+  attachments Attachment[]
+
+  @@index([assigneeId])
+  @@index([status])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+}
+
+model PerformanceReview {
+  id        String   @id @default(cuid())
+  userId    String
+  period    String // Ví dụ: "HK1 2026-2027" hoặc "90 ngày"
+  score     Float
+  summary   String   @db.Text // Nhận xét do AI tạo
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────── Module 6: Chatbot tri thức ─────────────────────
+
+model KbArticle {
+  id          String   @id @default(cuid())
+  title       String
+  category    String
+  content     String   @db.Text
+  tags        String? // phân tách bằng dấu phẩy
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id])
+}
+
+model ChatLog {
+  id        String   @id @default(cuid())
+  userId    String
+  question  String   @db.Text
+  answer    String   @db.Text
+  sources   String? // id bài viết, phân tách bằng dấu phẩy
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

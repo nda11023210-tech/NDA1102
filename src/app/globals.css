@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+/* ───────── Design tokens: "Institution navy" ─────────
+   Màu chủ đạo xanh navy học thuật + xanh dương hành động + xanh lá trạng thái tốt.
+   Để đổi sang màu nhận diện của trường: chỉ sửa các biến --brand-* bên dưới. */
+:root {
+  --brand-900: #0c1f38;
+  --brand-800: #132b4b;
+  --brand-700: #1e3a5f;
+  --brand-600: #24497a;
+  --brand-100: #e3ebf6;
+  --brand-50: #f1f5fb;
+  --action: #2563eb;
+  --action-hover: #1d4ed8;
+}
+
+@theme inline {
+  --font-sans: var(--font-be-vietnam), "Noto Sans", system-ui, sans-serif;
+
+  --color-brand-900: var(--brand-900);
+  --color-brand-800: var(--brand-800);
+  --color-brand-700: var(--brand-700);
+  --color-brand-600: var(--brand-600);
+  --color-brand-100: var(--brand-100);
+  --color-brand-50: var(--brand-50);
+  --color-action: var(--action);
+  --color-action-hover: var(--action-hover);
+
+  --color-canvas: #f5f7fb;
+  --color-ink: #0f172a;
+  --color-ink-soft: #334155;
+  --color-ink-muted: #5b6b80;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-feature-settings: "cv11", "ss01";
+}
+
+:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)];
+  }
+  .card-pad {
+    @apply p-5 sm:p-6;
+  }
+
+  .btn {
+    @apply inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-sm {
+    @apply min-h-8 px-3 text-[13px];
+  }
+  .btn-primary {
+    @apply bg-action text-white hover:bg-action-hover;
+  }
+  .btn-brand {
+    @apply bg-brand-700 text-white hover:bg-brand-800;
+  }
+  .btn-secondary {
+    @apply border border-line-strong bg-white text-ink-soft hover:bg-slate-50;
+  }
+  .btn-ghost {
+    @apply text-ink-soft hover:bg-slate-100;
+  }
+  .btn-success {
+    @apply bg-emerald-600 text-white hover:bg-emerald-700;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+  .btn-danger-soft {
+    @apply border border-red-200 bg-white text-red-700 hover:bg-red-50;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-soft;
+  }
+  .input {
+    @apply block min-h-10 w-full rounded-lg border border-line-strong bg-white px-3 py-2 text-sm text-ink placeholder:text-slate-400 transition-colors focus:border-action focus:ring-2 focus:ring-blue-100 focus:outline-none;
+  }
+  textarea.input {
+    @apply min-h-24 leading-relaxed;
+  }
+  .hint {
+    @apply mt-1 text-xs text-ink-muted;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+
+  .table {
+    @apply w-full text-left text-sm;
+  }
+  .table thead th {
+    @apply border-b border-line bg-slate-50/80 px-4 py-3 text-xs font-semibold tracking-wide text-ink-muted uppercase;
+  }
+  .table tbody td {
+    @apply border-b border-line px-4 py-3 align-middle;
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .table tbody tr {
+    @apply transition-colors hover:bg-slate-50/70;
+  }
+
+  .tab {
+    @apply inline-flex min-h-9 cursor-pointer items-center rounded-lg px-3 text-sm font-medium text-ink-muted transition-colors hover:bg-white hover:text-ink;
+  }
+  .tab-active {
+    @apply bg-white text-ink shadow-sm;
+  }
+
+  .prose-kb {
+    @apply text-[15px] leading-7 text-ink-soft;
+  }
+  .prose-kb p {
+    @apply mb-3;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+  aside,
+  nav,
+  .no-print,
+  .lg\:hidden {
+    display: none !important;
+  }
+  .lg\:pl-\[264px\] {
+    padding-left: 0 !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .card {
+    box-shadow: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
