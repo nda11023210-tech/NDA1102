@@ -11,7 +11,7 @@ import bcrypt from "bcryptjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { solveTimetable, type Kind, type RoomType } from "../src/lib/scheduler";
+import { planTimetable, type Kind, type RoomType } from "../src/lib/scheduler";
 
 const db = new PrismaClient();
 const DAY = 86_400_000;
@@ -215,7 +215,7 @@ async function main() {
     }
   }
 
-  // ───────── Module 2: Tài sản ─────────
+  // ───────── Module 2: Trang thiết bị ─────────
   const assetSpecs: [string, string, string, string, number][] = [
     ["LAB-A3201", "Phòng máy thực hành A3.201 (40 máy)", "LAB", "Tòa A3 – Tầng 2", 820_000_000],
     ["LAB-A3202", "Phòng máy thực hành A3.202 (40 máy)", "LAB", "Tòa A3 – Tầng 2", 790_000_000],
@@ -411,34 +411,44 @@ async function main() {
     ["MĐ05", "Lập trình Android", "MD", 90],
     ["MĐ06", "Thiết kế đồ họa với Photoshop", "MD", 75],
   ];
-  const subjects = [];
+  const subjects: Awaited<ReturnType<typeof db.subject.create>>[] = [];
   for (const [code, name, kind, hours] of subjectSpecs) subjects.push(await db.subject.create({ data: { code, name, kind, hours } }));
-  // Mỗi giảng viên: 2–3 phân công, tổng đúng 5 buổi; học phần theo chuyên môn (1 MH + 1 MĐ chính)
-  const splits = [[3, 2], [2, 2, 1], [3, 2], [2, 3], [1, 2, 2], [3, 2], [2, 2, 1], [2, 3], [3, 2], [2, 1, 2], [3, 2], [2, 3]];
-  const mainSubjects = [[6, 0], [2, 8], [1, 4], [9, 3], [11, 4], [7, 5], [4, 1], [5, 2], [10, 0], [8, 2], [0, 6], [3, 9]];
-  let cls = 0;
-  for (let g = 0; g < lecturers.length; g++) {
-    for (let j = 0; j < splits[g].length; j++) {
-      const subj = subjects[mainSubjects[g][j % 2]];
-      await db.teachingAssignment.create({
-        data: { lecturerId: lecturers[g].id, classGroupId: classes[cls++ % classes.length].id, subjectId: subj.id, sessionsPerWeek: splits[g][j] },
-      });
+  // Kế hoạch giảng dạy của lớp: mỗi lớp 3 học phần (3 + 2 + 2 = 7 buổi/tuần) → 56 buổi cho 12 GV
+  for (let c = 0; c < classes.length; c++) {
+    const subs = [0, 1, 2].map((k) => subjects[(c * 3 + k) % subjects.length]);
+    for (const [k, sub] of subs.entries()) {
+      await db.classSubject.create({ data: { classGroupId: classes[c].id, subjectId: sub.id, sessionsPerWeek: [3, 2, 2][k] } });
     }
   }
-  const asg = await db.teachingAssignment.findMany({ include: { subject: true } });
-  const sol = solveTimetable({
-    assignments: asg.map((a) => ({ id: a.id, lecturerId: a.lecturerId, classGroupId: a.classGroupId, kind: a.subject.kind as Kind, sessionsPerWeek: a.sessionsPerWeek })),
+  // Giảng viên đăng ký môn có thể dạy: 2 môn chuyên môn chính + 1 môn phụ
+  const mainSubjects = [[6, 0], [2, 8], [1, 4], [9, 3], [11, 4], [7, 5], [4, 1], [5, 2], [10, 0], [8, 2], [0, 6], [3, 9]];
+  for (let g = 0; g < lecturers.length; g++) {
+    const ids = new Set([...mainSubjects[g], (g + 5) % subjects.length].map((i) => subjects[i].id));
+    for (const subjectId of ids) await db.teachingPreference.create({ data: { userId: lecturers[g].id, subjectId } });
+  }
+
+  // Xếp TKB mẫu bằng đúng quy trình của hệ thống: phân bổ giảng viên → xếp lịch tuần
+  const plans = await db.classSubject.findMany({ include: { subject: true } });
+  const prefs = await db.teachingPreference.findMany();
+  const sol = planTimetable({
+    demands: plans.map((p) => ({ classGroupId: p.classGroupId, subjectId: p.subjectId, kind: p.subject.kind as Kind, sessions: p.sessionsPerWeek })),
+    lecturers: lecturers.map((l) => ({ id: l.id, registered: prefs.filter((p) => p.userId === l.id).map((p) => p.subjectId) })),
     rooms: rooms.map((r) => ({ id: r.id, type: r.type as RoomType })),
     seed: 2026,
   });
   if (!sol.ok) throw new Error("Không xếp được TKB mẫu: " + sol.errors.join("; "));
-  await db.timetable.create({
-    data: {
-      name: "TKB Học kỳ I 2026–2027 (chính thức)",
-      status: "PUBLISHED",
-      note: `Xếp tự động: ${sol.stats.variables} buổi, ${sol.stats.ms}ms.`,
-      entries: { create: sol.entries.map((e) => ({ assignmentId: e.assignmentId, day: e.day, slot: e.slot, roomId: e.roomId })) },
-    },
+  const tt = await db.timetable.create({
+    data: { name: "TKB Học kỳ I 2026–2027 (chính thức)", status: "PUBLISHED", note: `Xếp tự động: ${sol.entries.length} buổi, ${sol.stats.ms}ms. ${sol.warnings.join(" ")}`.trim() },
+  });
+  const idByKey = new Map<string, string>();
+  for (const a of sol.allocation.allocations) {
+    const row = await db.teachingAssignment.create({
+      data: { lecturerId: a.lecturerId, classGroupId: a.classGroupId, subjectId: a.subjectId, sessionsPerWeek: a.sessions, outsideRegistration: a.outsideRegistration, timetableId: tt.id },
+    });
+    idByKey.set(a.key, row.id);
+  }
+  await db.timetableEntry.createMany({
+    data: sol.entries.map((e) => ({ timetableId: tt.id, assignmentId: idByKey.get(e.assignmentId)!, day: e.day, slot: e.slot, roomId: e.roomId })),
   });
 
   // ───────── Module 5: Công việc ─────────
@@ -529,9 +539,9 @@ async function main() {
     ],
     [
       "Hướng dẫn mượn, trả thiết bị dạy học",
-      "Tài sản",
+      "Trang thiết bị",
       "mượn máy chiếu, mượn laptop, thiết bị, QR",
-      "1. Mở mục **Tài sản & Thiết bị**, tìm thiết bị cần mượn (hoặc quét mã QR dán trên thiết bị bằng camera điện thoại).\n2. Bấm **Đăng ký mượn**, nhập mục đích và thời gian mượn – trả.\n3. Quản lý khoa duyệt yêu cầu trên hệ thống; nhận thiết bị tại Văn phòng Khoa (A1.104).\n4. Khi trả, kiểm tra tình trạng cùng Quản lý khoa. Thiết bị hư hỏng sẽ được chuyển sang trạng thái Bảo trì.\n\n**Lưu ý:** trả thiết bị đúng hạn; quá hạn 2 lần trong học kỳ sẽ bị tạm dừng quyền mượn.",
+      "1. Mở mục **Trang thiết bị**, tìm thiết bị cần mượn (hoặc quét mã QR dán trên thiết bị bằng camera điện thoại).\n2. Bấm **Đăng ký mượn**, nhập mục đích và thời gian mượn – trả.\n3. Quản lý khoa duyệt yêu cầu trên hệ thống; nhận thiết bị tại Văn phòng Khoa (A1.104).\n4. Khi trả, kiểm tra tình trạng cùng Quản lý khoa. Thiết bị hư hỏng sẽ được chuyển sang trạng thái Bảo trì.\n\n**Lưu ý:** trả thiết bị đúng hạn; quá hạn 2 lần trong học kỳ sẽ bị tạm dừng quyền mượn.",
     ],
     [
       "Hồ sơ giảng dạy giảng viên cần chuẩn bị",
@@ -565,9 +575,9 @@ async function main() {
     ],
     [
       "Sử dụng phòng thực hành máy tính",
-      "Tài sản",
+      "Trang thiết bị",
       "phòng máy, phòng thực hành, nội quy, cài đặt phần mềm",
-      "- Giảng viên dạy buổi đầu tiên mỗi tuần kiểm tra tình trạng phòng máy và ghi vào sổ theo dõi.\n- Không tự ý cài đặt phần mềm không có bản quyền. Yêu cầu cài phần mềm gửi Quản lý khoa trước **03 ngày**.\n- Sự cố máy hỏng: ghi số máy, mô tả lỗi và báo qua mục Tài sản để chuyển trạng thái Bảo trì.\n- Cuối buổi: tắt máy, tắt điều hòa, khóa cửa và bàn giao chìa khóa.",
+      "- Giảng viên dạy buổi đầu tiên mỗi tuần kiểm tra tình trạng phòng máy và ghi vào sổ theo dõi.\n- Không tự ý cài đặt phần mềm không có bản quyền. Yêu cầu cài phần mềm gửi Quản lý khoa trước **03 ngày**.\n- Sự cố máy hỏng: ghi số máy, mô tả lỗi và báo qua mục Trang thiết bị để chuyển trạng thái Bảo trì.\n- Cuối buổi: tắt máy, tắt điều hòa, khóa cửa và bàn giao chìa khóa.",
     ],
   ];
   for (const [title, category, tags, content] of kb) {

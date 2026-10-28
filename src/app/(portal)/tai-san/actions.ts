@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireRole, requireUser } from "@/lib/auth";
 import { attempt, fail, ok, type ActionState } from "@/lib/action-state";
@@ -18,9 +19,9 @@ export async function createAsset(_: ActionState, fd: FormData): Promise<ActionS
     const code = str(fd, "code").toUpperCase();
     const name = str(fd, "name");
     const category = str(fd, "category");
-    if (!code || !name || !ASSET_CATEGORY[category]) return fail("Vui lòng nhập mã, tên và chọn loại tài sản.");
-    if (!/^[A-Z0-9-]{3,30}$/.test(code)) return fail("Mã tài sản chỉ gồm chữ in hoa, số và dấu gạch ngang (3–30 ký tự).");
-    if (await db.asset.findUnique({ where: { code } })) return fail("Mã tài sản đã tồn tại.");
+    if (!code || !name || !ASSET_CATEGORY[category]) return fail("Vui lòng nhập mã, tên và chọn loại thiết bị.");
+    if (!/^[A-Z0-9-]{3,30}$/.test(code)) return fail("Mã thiết bị chỉ gồm chữ in hoa, số và dấu gạch ngang (3–30 ký tự).");
+    if (await db.asset.findUnique({ where: { code } })) return fail("Mã thiết bị đã tồn tại.");
     const value = Number(str(fd, "value").replace(/\D/g, ""));
     await db.asset.create({
       data: {
@@ -35,23 +36,63 @@ export async function createAsset(_: ActionState, fd: FormData): Promise<ActionS
       },
     });
     refresh();
-    return ok(`Đã thêm tài sản ${code}.`);
+    return ok(`Đã thêm thiết bị ${code}.`);
   });
 }
 
+/** Sửa toàn bộ thông tin thiết bị (đổi mã thì tem QR cũ hết hiệu lực – cần in lại tem) */
 export async function updateAsset(_: ActionState, fd: FormData): Promise<ActionState> {
-  return attempt(async () => {
+  let newCode = "";
+  const res = await attempt(async () => {
     await requireRole("MANAGER");
     const id = str(fd, "id");
+    const code = str(fd, "code").toUpperCase();
+    const name = str(fd, "name");
+    const category = str(fd, "category");
     const status = str(fd, "status");
+    if (!code || !name || !ASSET_CATEGORY[category]) return fail("Vui lòng nhập mã, tên và chọn loại thiết bị.");
+    if (!/^[A-Z0-9-]{3,30}$/.test(code)) return fail("Mã thiết bị chỉ gồm chữ in hoa, số và dấu gạch ngang (3–30 ký tự).");
     if (!ASSET_STATUS[status]) return fail("Trạng thái không hợp lệ.");
-    const a = await db.asset.update({
+    const old = await db.asset.findUniqueOrThrow({ where: { id } });
+    if (code !== old.code && (await db.asset.findUnique({ where: { code } }))) return fail("Mã thiết bị đã tồn tại.");
+    const value = Number(str(fd, "value").replace(/\D/g, ""));
+    await db.asset.update({
       where: { id },
-      data: { status, location: str(fd, "location"), note: str(fd, "note") || null },
+      data: {
+        code,
+        name,
+        category,
+        status,
+        location: str(fd, "location") || "Kho Khoa",
+        serial: str(fd, "serial") || null,
+        purchaseDate: fromLocalInput(str(fd, "purchaseDate")),
+        value: value || null,
+        note: str(fd, "note") || null,
+      },
     });
-    refresh(a.code);
-    return ok("Đã cập nhật tài sản.");
+    refresh(old.code);
+    newCode = code !== old.code ? code : "";
+    return ok(code !== old.code ? "Đã cập nhật thiết bị. Mã đã đổi – nhớ in lại tem QR." : "Đã cập nhật thiết bị.");
   });
+  if (res?.ok && newCode) redirect(`/tai-san/${newCode}`);
+  return res;
+}
+
+/** Xóa thiết bị (kèm lịch sử mượn/trả và kiểm kê). Không cho xóa khi đang có người mượn hoặc chờ duyệt mượn. */
+export async function deleteAsset(_: ActionState, fd: FormData): Promise<ActionState> {
+  let deleted = false;
+  const res = await attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const active = await db.assetLoan.count({ where: { assetId: id, status: { in: ["PENDING", "APPROVED"] } } });
+    if (active) return fail("Thiết bị đang có yêu cầu mượn chờ duyệt hoặc đang được mượn. Hãy xử lý xong việc mượn/trả trước khi xóa.");
+    const a = await db.asset.delete({ where: { id } });
+    refresh();
+    deleted = str(fd, "from") === "detail";
+    return ok(`Đã xóa thiết bị ${a.code}.`);
+  });
+  if (res?.ok && deleted) redirect("/tai-san");
+  return res;
 }
 
 export async function requestLoan(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -64,7 +105,7 @@ export async function requestLoan(_: ActionState, fd: FormData): Promise<ActionS
     if (!startAt || !dueAt || !purpose) return fail("Vui lòng nhập mục đích và thời gian mượn.");
     if (dueAt <= startAt) return fail("Thời gian trả phải sau thời gian mượn.");
     const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
-    if (asset.status !== "AVAILABLE") return fail("Tài sản hiện không sẵn sàng để mượn.");
+    if (asset.status !== "AVAILABLE") return fail("Thiết bị hiện không sẵn sàng để mượn.");
     const overlap = await db.assetLoan.findFirst({
       where: { assetId, status: { in: ["PENDING", "APPROVED"] }, startAt: { lt: dueAt }, dueAt: { gt: startAt } },
     });

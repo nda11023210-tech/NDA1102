@@ -1,16 +1,23 @@
 // Chạy thử trên máy không có MySQL: sinh schema SQLite từ prisma/schema.prisma,
 // tạo CSDL prisma/local/dev.db, sinh Prisma Client cho SQLite và nạp dữ liệu mẫu.
 // Lưu ý: sau đó `npm run build` (bản production) sẽ sinh lại client cho MySQL.
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 
 const src = readFileSync("prisma/schema.prisma", "utf8");
 const sqlite = src
   .replace('provider = "mysql"', 'provider = "sqlite"')
-  .replace('url      = env("DATABASE_URL")', 'url      = "file:./dev.db"')
+  // Giữ env("DATABASE_URL"): file .env đặt DATABASE_URL="file:./dev.db" (tạo tự động bên dưới)
   .replace(/\s@db\.\w+(\([^)]*\))?/g, "");
 
 mkdirSync("prisma/local", { recursive: true });
+
+// .env local: trỏ DATABASE_URL tới SQLite (đường dẫn tính từ thư mục prisma/local)
+const envPath = ".env";
+const env = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+if (!/^DATABASE_URL=/m.test(env)) writeFileSync(envPath, `${env.trimEnd()}
+DATABASE_URL="file:./dev.db"
+`);
 writeFileSync("prisma/local/schema.prisma", sqlite);
 
 const run = (cmd) => execSync(cmd, { stdio: "inherit" });

@@ -33,7 +33,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: "Nghiệp vụ",
     items: [
       { href: "/van-ban", label: "Văn bản & Thông báo", icon: FileText, badgeKey: "docs" },
-      { href: "/tai-san", label: "Tài sản & Thiết bị", icon: Boxes, badgeKey: "loans" },
+      { href: "/tai-san", label: "Trang thiết bị", icon: Boxes, badgeKey: "loans" },
       { href: "/minh-chung", label: "Minh chứng Sở ngành", icon: ClipboardCheck, badgeKey: "evidence" },
       { href: "/thoi-khoa-bieu", label: "Thời khóa biểu", icon: CalendarRange },
       { href: "/cong-viec", label: "Công việc", icon: ListTodo, badgeKey: "tasks" },

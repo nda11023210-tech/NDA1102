@@ -9,7 +9,7 @@ export const metadata = { title: "Đăng nhập" };
 
 const FEATURES = [
   { icon: FileCheck2, text: "Văn bản điện tử & ký nhận" },
-  { icon: Boxes, text: "Tài sản, mượn trả, kiểm kê QR" },
+  { icon: Boxes, text: "Thiết bị, mượn trả, kiểm kê QR" },
   { icon: ClipboardCheck, text: "Nộp & duyệt minh chứng" },
   { icon: CalendarRange, text: "Xếp thời khóa biểu tự động" },
   { icon: BarChart3, text: "Giao việc & đánh giá hiệu suất" },

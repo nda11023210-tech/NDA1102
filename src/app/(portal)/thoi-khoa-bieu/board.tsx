@@ -19,6 +19,7 @@ export type BoardEntry = {
   roomId: string;
   roomCode: string;
   lecturerId: string;
+  outside: boolean; // giảng viên không đăng ký môn này
   conflicts: string[];
 };
 export type BoardRoom = { id: string; code: string; type: string };
@@ -116,7 +117,7 @@ export function TimetableBoard({ entries, lecturers, rooms, editable }: { entrie
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] table-fixed border-separate border-spacing-0 text-xs">
+        <table className="w-full min-w-[1500px] table-fixed border-separate border-spacing-0 text-xs">
           <thead className="sticky top-0 z-10">
             <tr>
               <th rowSpan={2} className="sticky left-0 z-10 w-52 border-b border-line bg-slate-50 px-3 py-2 text-left font-semibold text-ink-muted uppercase">
@@ -145,8 +146,8 @@ export function TimetableBoard({ entries, lecturers, rooms, editable }: { entrie
                 <tr key={l.id}>
                   <th scope="row" className="sticky left-0 z-[1] border-b border-line bg-white px-3 py-2 text-left font-normal">
                     <div className="truncate text-[13px] font-medium text-ink">{l.name}</div>
-                    <div className={cn("text-[11px]", count === SESSIONS_PER_LECTURER ? "text-emerald-700" : "font-semibold text-red-700")}>
-                      {count}/{SESSIONS_PER_LECTURER} buổi
+                    <div className={cn("text-[11px]", count > SESSIONS_PER_LECTURER ? "font-semibold text-red-700" : "text-ink-muted")}>
+                      {count} buổi/tuần
                     </div>
                   </th>
                   {DAYS.flatMap((_, day) =>
@@ -157,7 +158,7 @@ export function TimetableBoard({ entries, lecturers, rooms, editable }: { entrie
                         <td
                           key={`${day}-${slot}`}
                           className={cn(
-                            "h-[68px] border-b border-l border-line p-1 align-top transition-colors",
+                            "h-[84px] border-b border-l border-line p-1 align-top transition-colors",
                             slot === 0 && "border-l-line-strong",
                             target && "cursor-pointer bg-blue-50/70 hover:bg-blue-100",
                           )}
@@ -181,7 +182,7 @@ export function TimetableBoard({ entries, lecturers, rooms, editable }: { entrie
                                 ev.stopPropagation();
                                 if (editable) setSelected(selected === e.id ? null : e.id);
                               }}
-                              title={e.conflicts.length ? e.conflicts.join(", ") : `${e.subject} – ${e.classCode} – Phòng ${e.roomCode}`}
+                              title={`${e.subjectCode} ${e.subject} – Lớp ${e.classCode} – Phòng ${e.roomCode}${e.conflicts.length ? ` – ${e.conflicts.join(", ")}` : ""}`}
                               aria-pressed={selected === e.id}
                               aria-label={`${e.subject}, lớp ${e.classCode}, phòng ${e.roomCode}${e.locked ? ", đã khóa" : ""}${e.conflicts.length ? `, xung đột: ${e.conflicts.join(", ")}` : ""}`}
                               className={cn(
@@ -193,12 +194,12 @@ export function TimetableBoard({ entries, lecturers, rooms, editable }: { entrie
                               )}
                             >
                               <span className="flex items-center justify-between gap-1">
-                                <span className="truncate font-semibold text-ink">{e.subjectCode}</span>
+                                <span className="font-semibold break-all text-ink">{e.subjectCode}</span>
                                 {e.locked && <Lock className="size-2.5 shrink-0 text-ink-muted" aria-hidden />}
                               </span>
-                              <span className="block truncate text-ink-muted">
-                                {e.classCode} · {e.roomCode}
-                              </span>
+                              <span className="block break-all text-ink-soft">Lớp {e.classCode}</span>
+                              <span className="block break-all text-ink-soft">P. {e.roomCode}</span>
+                              {e.outside && <span className="mt-0.5 block text-[10px] font-medium text-amber-700">Ngoài đăng ký</span>}
                             </button>
                           ))}
                         </td>

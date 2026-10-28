@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/auth";
+import { requireRole, requireUser } from "@/lib/auth";
 import { attempt, fail, ok, type ActionState } from "@/lib/action-state";
-import { runScheduler } from "@/lib/timetable";
+import { runScheduler, saveTimetable } from "@/lib/timetable";
+import { MAX_PER_LECTURER } from "@/lib/scheduler";
 import { str } from "@/lib/utils";
 
 const refresh = () => revalidatePath("/thoi-khoa-bieu", "layout");
@@ -17,15 +18,9 @@ export async function generateTimetable(_: ActionState, fd: FormData): Promise<A
     const keepFrom = str(fd, "keepLockedFrom") || undefined;
     const result = await runScheduler(keepFrom);
     if (!result.ok) return fail(result.errors.join(" "));
+    if (!result.entries.length) return fail("Chưa có kế hoạch giảng dạy nào để xếp. Hãy nhập Kế hoạch giảng dạy của lớp trong mục Phân công & dữ liệu nền.");
     const name = str(fd, "name") || `Bản xếp tự động ${new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date())}`;
-    const tt = await db.timetable.create({
-      data: {
-        name,
-        note: `Xếp tự động: ${result.stats.variables} buổi, ${result.stats.steps} bước tìm kiếm, ${result.stats.ms}ms. ${result.warnings.join(" ")}`.trim(),
-        entries: { create: result.entries.map((e) => ({ assignmentId: e.assignmentId, day: e.day, slot: e.slot, roomId: e.roomId, locked: !!e.locked })) },
-      },
-    });
-    newId = tt.id;
+    newId = (await saveTimetable(name, result)).id;
     return ok("Đã xếp thời khóa biểu.");
   });
   if (res?.ok) {
@@ -42,6 +37,12 @@ export async function publishTimetable(fd: FormData) {
     db.timetable.updateMany({ where: { status: "PUBLISHED" }, data: { status: "DRAFT" } }),
     db.timetable.update({ where: { id }, data: { status: "PUBLISHED" } }),
   ]);
+  refresh();
+}
+
+export async function unpublishTimetable(fd: FormData) {
+  await requireRole("MANAGER");
+  await db.timetable.update({ where: { id: str(fd, "id") }, data: { status: "DRAFT" } });
   refresh();
 }
 
@@ -144,6 +145,8 @@ export async function createAssignment(_: ActionState, fd: FormData): Promise<Ac
     const sessionsPerWeek = Number(str(fd, "sessionsPerWeek"));
     if (!lecturerId || !classGroupId || !subjectId) return fail("Vui lòng chọn giảng viên, lớp và học phần.");
     if (!(sessionsPerWeek >= 1 && sessionsPerWeek <= 5)) return fail("Số buổi/tuần từ 1 đến 5.");
+    const used = await db.teachingAssignment.aggregate({ where: { lecturerId, timetableId: null }, _sum: { sessionsPerWeek: true } });
+    if ((used._sum.sessionsPerWeek ?? 0) + sessionsPerWeek > MAX_PER_LECTURER) return fail(`Giảng viên này đã có ${used._sum.sessionsPerWeek ?? 0} buổi cố định – tối đa ${MAX_PER_LECTURER} buổi/tuần.`);
     await db.teachingAssignment.create({ data: { lecturerId, classGroupId, subjectId, sessionsPerWeek } });
     refresh();
     return ok("Đã thêm phân công.");
@@ -156,9 +159,97 @@ export async function deleteAssignment(fd: FormData) {
   refresh();
 }
 
-export async function updateAssignmentSessions(fd: FormData) {
+// ───────── Kế hoạch giảng dạy của lớp ─────────
+
+export async function saveClassSubject(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const classGroupId = str(fd, "classGroupId");
+    const subjectId = str(fd, "subjectId");
+    const sessionsPerWeek = Number(str(fd, "sessionsPerWeek"));
+    if (!classGroupId || !subjectId) return fail("Vui lòng chọn lớp và học phần.");
+    if (!(sessionsPerWeek >= 1 && sessionsPerWeek <= 5)) return fail("Số buổi/tuần từ 1 đến 5 (mỗi ngày tối đa 1 buổi cùng môn).");
+    const others = await db.classSubject.aggregate({ where: { classGroupId, NOT: { subjectId } }, _sum: { sessionsPerWeek: true } });
+    if ((others._sum.sessionsPerWeek ?? 0) + sessionsPerWeek > 10) return fail("Tổng số buổi của lớp vượt quá 10 buổi/tuần.");
+    await db.classSubject.upsert({
+      where: { classGroupId_subjectId: { classGroupId, subjectId } },
+      create: { classGroupId, subjectId, sessionsPerWeek },
+      update: { sessionsPerWeek },
+    });
+    refresh();
+    return ok("Đã lưu kế hoạch giảng dạy.");
+  });
+}
+
+export async function deleteClassSubject(fd: FormData) {
   await requireRole("MANAGER");
-  const n = Number(str(fd, "sessionsPerWeek"));
-  if (n >= 1 && n <= 5) await db.teachingAssignment.update({ where: { id: str(fd, "id") }, data: { sessionsPerWeek: n } });
+  await db.classSubject.delete({ where: { id: str(fd, "id") } });
   refresh();
+}
+
+// ───────── Xóa dữ liệu nền ─────────
+// Không cho xóa khi còn được dùng trong một phiên bản TKB, để không làm hỏng lịch đã xếp/công bố.
+
+async function usedInTimetables(where: { roomId?: string; classGroupId?: string; subjectId?: string }) {
+  const entries = await db.timetableEntry.findMany({
+    where: where.roomId ? { roomId: where.roomId } : { assignment: { classGroupId: where.classGroupId, subjectId: where.subjectId } },
+    select: { timetable: { select: { name: true } } },
+    distinct: ["timetableId"],
+  });
+  return entries.map((e) => e.timetable.name);
+}
+
+const inUseMessage = (what: string, names: string[]) =>
+  `${what} đang được dùng trong thời khóa biểu: ${names.slice(0, 3).join(", ")}${names.length > 3 ? "…" : ""}. Hãy xóa các phiên bản đó trước (bản đang công bố cần hủy công bố rồi xóa).`;
+
+export async function deleteRoom(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const names = await usedInTimetables({ roomId: id });
+    if (names.length) return fail(inUseMessage("Phòng", names));
+    const r = await db.room.delete({ where: { id } });
+    refresh();
+    return ok(`Đã xóa phòng ${r.code}.`);
+  });
+}
+
+export async function deleteClassGroup(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const names = await usedInTimetables({ classGroupId: id });
+    if (names.length) return fail(inUseMessage("Lớp", names));
+    const c = await db.classGroup.delete({ where: { id } }); // xóa kèm kế hoạch giảng dạy và phân công cố định của lớp
+    refresh();
+    return ok(`Đã xóa lớp ${c.code}.`);
+  });
+}
+
+export async function deleteSubject(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const names = await usedInTimetables({ subjectId: id });
+    if (names.length) return fail(inUseMessage("Học phần", names));
+    const s = await db.subject.delete({ where: { id } }); // xóa kèm kế hoạch, phân công cố định và đăng ký môn
+    refresh();
+    return ok(`Đã xóa học phần ${s.code}.`);
+  });
+}
+
+// ───────── Đăng ký môn dạy (mọi người dùng) ─────────
+
+export async function saveTeachingPreferences(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    const user = await requireUser();
+    const subjectIds = [...new Set(fd.getAll("subjectId").map(String).filter(Boolean))];
+    const valid = await db.subject.findMany({ where: { id: { in: subjectIds } }, select: { id: true } });
+    await db.$transaction([
+      db.teachingPreference.deleteMany({ where: { userId: user.id } }),
+      db.teachingPreference.createMany({ data: valid.map((s) => ({ userId: user.id, subjectId: s.id })) }),
+    ]);
+    refresh();
+    return ok(valid.length ? `Đã lưu ${valid.length} môn bạn có thể dạy.` : "Đã xóa toàn bộ đăng ký môn dạy của bạn.");
+  });
 }

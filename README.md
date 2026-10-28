@@ -8,9 +8,9 @@ Xây dựng bằng **Next.js 15 (Node.js) + Tailwind CSS 4 + Prisma + MySQL**, t
 | Module | Nội dung |
 |---|---|
 | **1. Văn bản & Thông báo** | Đăng văn bản theo danh mục (Công văn, Thông báo, Quyết định…), đính kèm tệp, ký nhận điện tử (gõ họ tên + lưu thời gian, IP), theo dõi tỷ lệ đã đọc/đã ký của từng người. |
-| **2. Tài sản & Thiết bị** | Danh mục tài sản, trạng thái sử dụng, đăng ký mượn – duyệt – trả, in tem QR, kiểm kê định kỳ bằng cách quét QR (camera điện thoại hoặc trình quét trong trang). |
+| **2. Trang thiết bị** | Danh mục thiết bị (thêm, sửa, xóa), trạng thái sử dụng, đăng ký mượn – duyệt – trả, in tem QR, kiểm kê định kỳ bằng cách quét QR (camera điện thoại hoặc trình quét trong trang). |
 | **3. Minh chứng Sở ban ngành** | Tạo đợt minh chứng theo tiêu chí, giảng viên nộp kèm tệp, Quản lý khoa phê duyệt một lần (ghi tên người duyệt, lịch sử không thể sửa), trả hồ sơ/nộp lại, xuất báo cáo Excel (CSV). |
-| **4. Thời khóa biểu thông minh** | Thuật toán CSP (quay lui + MRV + forward checking): mỗi GV đúng 5 buổi/tuần, không trùng GV/lớp/phòng, MĐ 6 giờ ở phòng thực hành, MH 5 giờ ở phòng lý thuyết. Chỉnh tay bằng kéo-thả, khóa buổi, xếp lại giữ buổi đã khóa, phát hiện xung đột, công bố phiên bản. |
+| **4. Thời khóa biểu thông minh** | Giảng viên tự đăng ký môn có thể dạy; Quản lý khoa nhập kế hoạch giảng dạy của lớp. Thuật toán 2 giai đoạn: (1) phân bổ giảng viên – ưu tiên môn đã đăng ký, chia đều tối đa 5 buổi/người (thiếu lớp/phòng thì chênh lệch ≤ 1 buổi); (2) xếp lịch tuần CSP – không trùng GV/lớp/phòng, MĐ 6 giờ ở phòng thực hành, MH 5 giờ ở phòng lý thuyết, ưu tiên mỗi GV dạy trọn buổi sáng hoặc trọn buổi chiều. Chỉnh tay kéo-thả, khóa buổi, công bố/hủy công bố, hiển thị đủ mã môn – lớp – phòng. |
 | **5. Giao việc & Hiệu suất** | Giao việc có hạn chót, tiêu chí nghiệm thu, khối lượng; nộp kết quả, nghiệm thu chấm sao. Chấm điểm tự động: Tiến độ 40% · Khối lượng 30% · Chất lượng 30%, biểu đồ, nhận xét do AI viết. |
 | **6. Trợ lý AI & Kho tri thức** | Kho quy chế/quy trình; chatbot tra cứu 24/7 (RAG: tìm kiếm BM25 không dấu → Claude trả lời kèm nguồn). Không có API key vẫn chạy ở chế độ tra cứu nhanh. |
 
@@ -45,6 +45,8 @@ Mở http://localhost:3000 và đăng nhập (mật khẩu mặc định `Kcntt@
 > ⚠️ Dữ liệu mẫu (tên người, văn bản, quy chế) là **giả lập**. Hãy đổi mật khẩu/xóa tài khoản mẫu và thay nội dung thật trước khi dùng chính thức.
 
 > Lưu ý: `npm run build` sinh lại Prisma Client cho MySQL. Nếu muốn quay lại chạy thử bằng SQLite sau đó, chạy lại `npm run local:sqlite`.
+
+Tài liệu giải thích chi tiết mã nguồn và cơ chế hoạt động: `docs/Giai-thich-ma-nguon.docx`.
 
 Kiểm thử thuật toán xếp thời khóa biểu:
 
@@ -113,15 +115,18 @@ Gắn tên miền cho ứng dụng trong hPanel và bật SSL miễn phí. Cooki
 
 Mỗi lần `git push` lên nhánh đã kết nối, Hostinger tự build và khởi động lại (nếu bật auto-deploy), hoặc bấm **Redeploy** trong hPanel.
 
-## Nâng cấp từ bản có vai trò Trưởng khoa / Trợ lý khoa
+## Nâng cấp CSDL đã có dữ liệu
 
-Nếu CSDL đã tạo trước khi gộp vai trò, chạy một lần (qua SSH trên Hostinger, hoặc trên máy):
+Khi cập nhật lên phiên bản mới, sau bước build (đã tự `prisma db push` thêm bảng/cột mới), chạy một lần (qua SSH trên Hostinger, hoặc trên máy):
 
 ```bash
-npx tsx scripts/migrate-roles.ts
+npx tsx scripts/migrate-data.ts
 ```
 
-Lệnh chuyển các tài khoản Trưởng khoa/Trợ lý khoa thành Quản lý khoa. Lịch sử duyệt minh chứng cũ được giữ nguyên.
+Lệnh an toàn khi chạy lại nhiều lần:
+- chuyển tài khoản Trưởng khoa/Trợ lý khoa (bản cũ) thành Quản lý khoa;
+- tách bộ phân công riêng cho từng phiên bản thời khóa biểu;
+- nếu chưa có, tạo Kế hoạch giảng dạy của lớp và Đăng ký môn dạy từ thời khóa biểu hiện có.
 
 ## Thay logo & màu nhận diện
 
@@ -134,7 +139,7 @@ Lệnh chuyển các tài khoản Trưởng khoa/Trợ lý khoa thành Quản l�
 ```
 prisma/schema.prisma        Mô hình dữ liệu (MySQL)
 prisma/seed.ts              Dữ liệu mẫu
-src/lib/scheduler.ts        Thuật toán xếp thời khóa biểu (CSP)
+src/lib/scheduler.ts        Thuật toán xếp thời khóa biểu (phân bổ giảng viên + CSP)
 src/lib/performance.ts      Chấm điểm hiệu suất theo trọng số
 src/lib/kb-search.ts        Tìm kiếm kho tri thức (BM25, không dấu)
 src/lib/ai.ts               Kết nối Claude API

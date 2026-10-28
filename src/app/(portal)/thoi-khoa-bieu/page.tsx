@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarRange, Sparkles, Send, Trash2 } from "lucide-react";
+import { CalendarRange, Sparkles, Send, Trash2, Undo2 } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canManageTimetable } from "@/lib/permissions";
@@ -9,7 +9,7 @@ import { cn, fmtDateTime } from "@/lib/utils";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { PrintButton } from "@/components/print-button";
-import { deleteTimetable, generateTimetable, publishTimetable } from "./actions";
+import { deleteTimetable, generateTimetable, publishTimetable, unpublishTimetable } from "./actions";
 import { TimetableBoard, type BoardEntry } from "./board";
 import { WeekGrid } from "./week-grid";
 
@@ -32,7 +32,8 @@ export default async function TimetablePage({ searchParams }: { searchParams: Pr
   const view = sp.view ?? (manager ? "khoa" : "gv");
 
   const [lecturers, classes, rooms] = await Promise.all([
-    db.user.findMany({ where: { assignments: { some: {} } }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    // Giảng viên có buổi dạy trong phiên bản đang xem
+    db.user.findMany({ where: { assignments: { some: { entries: { some: { timetableId: currentId ?? "" } } } } }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.classGroup.findMany({ orderBy: { code: "asc" } }),
     db.room.findMany({ orderBy: [{ type: "asc" }, { code: "asc" }] }),
   ]);
@@ -47,7 +48,7 @@ export default async function TimetablePage({ searchParams }: { searchParams: Pr
   const header = (
     <PageHeader
       title="Thời khóa biểu"
-      description={`Lịch giảng dạy Thứ 2 – Thứ 6, hai buổi Sáng/Chiều. Mô-đun (MĐ) học ${SUBJECT_KIND.MD.hours} giờ/buổi tại phòng thực hành; Môn học (MH) ${SUBJECT_KIND.MH.hours} giờ/buổi tại phòng lý thuyết. Mỗi giảng viên dạy đúng 5 buổi/tuần.`}
+      description={`Lịch giảng dạy Thứ 2 – Thứ 6, hai buổi Sáng/Chiều. Mô-đun (MĐ) học ${SUBJECT_KIND.MD.hours} giờ/buổi tại phòng thực hành; Môn học (MH) ${SUBJECT_KIND.MH.hours} giờ/buổi tại phòng lý thuyết. Mỗi giảng viên tối đa 5 buổi/tuần, ưu tiên môn đã đăng ký, chia đều và dạy trọn buổi sáng hoặc trọn buổi chiều.`}
       actions={<div className="no-print">{tt && <PrintButton label="In TKB" />}</div>}
     />
   );
@@ -58,7 +59,9 @@ export default async function TimetablePage({ searchParams }: { searchParams: Pr
         {header}
         <Card>
           <EmptyState icon={CalendarRange} title={manager ? "Chưa có thời khóa biểu" : "Chưa có thời khóa biểu được công bố"}>
-            {manager ? "Nhập phân công giảng dạy rồi bấm “Xếp tự động” để thuật toán tạo thời khóa biểu." : "Khoa sẽ công bố thời khóa biểu sớm."}
+            {manager
+              ? "Nhập Kế hoạch giảng dạy của lớp (mục Phân công & dữ liệu nền), nhắc giảng viên đăng ký môn dạy, rồi bấm “Xếp tự động”."
+              : "Khoa sẽ công bố thời khóa biểu sớm. Trong lúc chờ, hãy vào “Đăng ký môn dạy” để chọn các môn bạn có thể dạy."}
           </EmptyState>
           {manager && (
             <ActionForm action={generateTimetable} className="flex justify-center">
@@ -85,6 +88,7 @@ export default async function TimetablePage({ searchParams }: { searchParams: Pr
     roomId: e.roomId,
     roomCode: e.room.code,
     lecturerId: e.assignment.lecturerId,
+    outside: e.assignment.outsideRegistration,
     conflicts: tt.conflicts.get(e.id) ?? [],
   }));
   const filtered =
@@ -101,12 +105,12 @@ export default async function TimetablePage({ searchParams }: { searchParams: Pr
 
       {manager && (
         <div className="no-print mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="card card-pad flex flex-col gap-3 sm:flex-row sm:items-center">
-            <form action="/thoi-khoa-bieu" className="flex flex-1 items-center gap-2">
+          <div className="card card-pad flex flex-col gap-3 xl:flex-row xl:items-center">
+            <form action="/thoi-khoa-bieu" className="flex min-w-0 flex-1 items-center gap-2">
               <label htmlFor="tt-pick" className="text-sm font-medium whitespace-nowrap text-ink-soft">
                 Phiên bản
               </label>
-              <select id="tt-pick" name="tt" defaultValue={tt.id} className="input">
+              <select id="tt-pick" name="tt" defaultValue={tt.id} className="input min-w-0 flex-1 sm:min-w-56">
                 {versions.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.status === "PUBLISHED" ? "● " : ""}
@@ -118,7 +122,15 @@ export default async function TimetablePage({ searchParams }: { searchParams: Pr
             </form>
             <div className="flex flex-wrap items-center gap-2">
               {tt.status === "PUBLISHED" ? (
-                <Badge tone="green">Đang công bố</Badge>
+                <>
+                  <Badge tone="green">Đang công bố</Badge>
+                  <form action={unpublishTimetable}>
+                    <input type="hidden" name="id" value={tt.id} />
+                    <SubmitButton className="btn btn-danger-soft" confirm="Hủy công bố thời khóa biểu này? Giảng viên sẽ không còn thấy lịch cho tới khi công bố lại.">
+                      <Undo2 className="size-4" aria-hidden /> Hủy công bố
+                    </SubmitButton>
+                  </form>
+                </>
               ) : (
                 <form action={publishTimetable}>
                   <input type="hidden" name="id" value={tt.id} />

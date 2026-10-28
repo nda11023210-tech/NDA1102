@@ -20,14 +20,14 @@ export default async function PrintLabels({ searchParams }: { searchParams: Prom
     <>
       <div className="no-print">
         <PageHeader
-          title="In tem QR tài sản"
-          back={{ href: "/tai-san", label: "Danh mục tài sản" }}
+          title="In tem QR thiết bị"
+          back={{ href: "/tai-san", label: "Danh mục thiết bị" }}
           description={`${labels.length} tem. In trên giấy decal A4, cắt và dán lên thiết bị.`}
           actions={
             <>
               <form className="flex gap-2">
                 <label htmlFor="print-cat" className="sr-only">
-                  Loại tài sản
+                  Loại thiết bị
                 </label>
                 <select id="print-cat" name="cat" defaultValue={cat ?? ""} className="input w-auto">
                   <option value="">Tất cả loại</option>

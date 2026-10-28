@@ -40,6 +40,7 @@ model User {
   evidences         Evidence[]
   evidenceLogs      EvidenceLog[]
   assignments       TeachingAssignment[]
+  teachingPrefs     TeachingPreference[]
   tasksAssigned     Task[]              @relation("TaskAssignee")
   tasksCreated      Task[]              @relation("TaskAssigner")
   taskComments      TaskComment[]
@@ -269,6 +270,7 @@ model ClassGroup {
   size Int    @default(35)
 
   assignments TeachingAssignment[]
+  plans       ClassSubject[]
 }
 
 model Subject {
@@ -279,20 +281,57 @@ model Subject {
   hours Int    @default(60) // Tổng số giờ chương trình
 
   assignments TeachingAssignment[]
+  plans       ClassSubject[]
+  preferences TeachingPreference[]
 }
 
-// Phân công giảng dạy: GV x Lớp x Học phần, số buổi/tuần
-model TeachingAssignment {
+// Giảng viên đăng ký môn mình có thể dạy (mọi người dùng đều đăng ký được)
+model TeachingPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  subjectId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId])
+}
+
+// Kế hoạch giảng dạy của lớp: lớp học môn nào, bao nhiêu buổi/tuần (chưa chỉ định giảng viên).
+// Thuật toán tự chọn giảng viên cho từng dòng, ưu tiên người đã đăng ký môn.
+model ClassSubject {
   id              String @id @default(cuid())
-  lecturerId      String
   classGroupId    String
   subjectId       String
-  sessionsPerWeek Int    @default(1)
+  sessionsPerWeek Int    @default(2)
+
+  classGroup ClassGroup @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+  subject    Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([classGroupId, subjectId])
+}
+
+// Phân công giảng dạy: GV x Lớp x Học phần, số buổi/tuần.
+// - timetableId = null: phân công CỐ ĐỊNH do Quản lý khoa nhập tay (thuật toán bắt buộc giữ).
+// - timetableId có giá trị: phân công do thuật toán tạo, thuộc riêng một phiên bản TKB
+//   (xóa phiên bản thì xóa theo; sửa dữ liệu nền không ảnh hưởng bản cũ).
+model TeachingAssignment {
+  id                  String  @id @default(cuid())
+  lecturerId          String
+  classGroupId        String
+  subjectId           String
+  sessionsPerWeek     Int     @default(1)
+  timetableId         String?
+  outsideRegistration Boolean @default(false) // GV không đăng ký môn này nhưng phải nhận để đủ/chia đều
 
   lecturer   User             @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
   classGroup ClassGroup       @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
   subject    Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  timetable  Timetable?       @relation(fields: [timetableId], references: [id], onDelete: Cascade)
   entries    TimetableEntry[]
+
+  @@index([timetableId])
 }
 
 model Timetable {
@@ -303,7 +342,8 @@ model Timetable {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  entries TimetableEntry[]
+  entries     TimetableEntry[]
+  assignments TeachingAssignment[]
 }
 
 model TimetableEntry {

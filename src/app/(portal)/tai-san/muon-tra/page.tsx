@@ -56,7 +56,7 @@ export default async function LoansPage() {
     <>
       <PageHeader
         title="Mượn / Trả thiết bị"
-        description={manager ? "Duyệt yêu cầu mượn và xác nhận trả thiết bị. Thiết bị trả về có hư hỏng sẽ tự chuyển sang trạng thái Bảo trì." : "Theo dõi các yêu cầu mượn của bạn. Để mượn, mở trang tài sản (hoặc quét mã QR) và gửi yêu cầu."}
+        description={manager ? "Duyệt yêu cầu mượn và xác nhận trả thiết bị. Thiết bị trả về có hư hỏng sẽ tự chuyển sang trạng thái Bảo trì." : "Theo dõi các yêu cầu mượn của bạn. Để mượn, mở trang thiết bị (hoặc quét mã QR) và gửi yêu cầu."}
         actions={
           <Link href="/tai-san?st=AVAILABLE" className="btn btn-primary">
             <HandHelping className="size-4" aria-hidden /> Tìm thiết bị để mượn

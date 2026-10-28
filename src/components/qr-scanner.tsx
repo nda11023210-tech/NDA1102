@@ -11,7 +11,7 @@ declare global {
   }
 }
 
-/** Trích mã tài sản từ nội dung QR (URL .../tai-san/CODE) hoặc mã thuần */
+/** Trích mã thiết bị từ nội dung QR (URL .../tai-san/CODE) hoặc mã thuần */
 function extractCode(raw: string) {
   const m = raw.match(/\/tai-san\/([^/?#]+)/);
   return decodeURIComponent(m ? m[1] : raw).trim().toUpperCase();
@@ -100,7 +100,7 @@ export function QrScanner() {
         className="flex gap-2"
       >
         <label htmlFor="manual-code" className="sr-only">
-          Nhập mã tài sản
+          Nhập mã thiết bị
         </label>
         <div className="relative flex-1">
           <Keyboard className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />

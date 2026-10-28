@@ -1,6 +1,6 @@
-export const FACULTY_NAME = "Khoa Công nghệ Thông tin";
+export const FACULTY_NAME = "Khoa Kinh tế - Khoa học - CNTT";
 export const SCHOOL_NAME = "Trường Cao đẳng Công nghiệp Bắc Ninh";
-export const APP_NAME = "Cổng quản trị Khoa CNTT";
+export const APP_NAME = "Cổng quản trị Kinh tế - Khoa học - CNTT";
 
 export const ROLES = ["ADMIN", "MANAGER", "LECTURER"] as const;
 export type Role = (typeof ROLES)[number];
@@ -11,7 +11,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   LECTURER: "Giảng viên",
 };
 
-/** Quy đổi vai trò cũ (Trưởng khoa/Trợ lý khoa trước khi gộp) về vai trò hiện hành */
+
 export function normalizeRole(role: string): Role {
   if (role === "HEAD" || role === "ASSISTANT") return "MANAGER";
   return (ROLES as readonly string[]).includes(role) ? (role as Role) : "LECTURER";

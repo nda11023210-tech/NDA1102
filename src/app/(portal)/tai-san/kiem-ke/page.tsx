@@ -8,7 +8,7 @@ import { ActionForm, SubmitButton } from "@/components/forms";
 import { QrScanner } from "@/components/qr-scanner";
 import { createInventoryCheck } from "../actions";
 
-export const metadata = { title: "Kiểm kê tài sản" };
+export const metadata = { title: "Kiểm kê thiết bị" };
 
 export default async function InventoryPage() {
   const user = await requireUser();

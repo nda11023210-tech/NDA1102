@@ -1,153 +1,308 @@
-import { Trash2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { SESSIONS_PER_LECTURER, SUBJECT_KIND } from "@/lib/constants";
-import { validateInput, type Kind, type RoomType } from "@/lib/scheduler";
+import { SUBJECT_KIND } from "@/lib/constants";
+import { allocateLecturers, MAX_PER_LECTURER, validateInput, type Kind, type RoomType } from "@/lib/scheduler";
+import { loadPlanInput } from "@/lib/timetable";
 import { cn } from "@/lib/utils";
 import { Badge, Card, Field, PageHeader } from "@/components/ui";
 import { ActionForm, Disclosure, SubmitButton } from "@/components/forms";
-import { createAssignment, deleteAssignment, saveClassGroup, saveRoom, saveSubject, updateAssignmentSessions } from "../actions";
+import { DeleteButton } from "@/components/delete-button";
+import {
+  createAssignment,
+  deleteAssignment,
+  deleteClassGroup,
+  deleteClassSubject,
+  deleteRoom,
+  deleteSubject,
+  saveClassGroup,
+  saveClassSubject,
+  saveRoom,
+  saveSubject,
+} from "../actions";
 
 export const metadata = { title: "Phân công giảng dạy" };
 
 export default async function AssignmentsPage() {
   await requireRole("MANAGER");
-  const [lecturers, classes, subjects, rooms, assignments] = await Promise.all([
+  const [staff, classes, subjects, rooms, fixed, plans, prefs, planInput] = await Promise.all([
     db.user.findMany({ where: { active: true, role: { not: "ADMIN" } }, orderBy: { name: "asc" } }),
-    db.classGroup.findMany({ orderBy: { code: "asc" }, include: { assignments: { select: { sessionsPerWeek: true } } } }),
-    db.subject.findMany({ orderBy: { code: "asc" } }),
+    db.classGroup.findMany({ orderBy: { code: "asc" } }),
+    db.subject.findMany({ orderBy: [{ kind: "asc" }, { code: "asc" }] }),
     db.room.findMany({ orderBy: [{ type: "asc" }, { code: "asc" }] }),
-    db.teachingAssignment.findMany({ include: { lecturer: true, classGroup: true, subject: true }, orderBy: [{ lecturer: { name: "asc" } }] }),
+    db.teachingAssignment.findMany({ where: { timetableId: null }, include: { lecturer: true, classGroup: true, subject: true }, orderBy: [{ lecturer: { name: "asc" } }] }),
+    db.classSubject.findMany({ include: { subject: true }, orderBy: { subject: { code: "asc" } } }),
+    db.teachingPreference.findMany({ include: { user: { select: { id: true, name: true } } } }),
+    loadPlanInput(),
   ]);
 
-  const issues = validateInput({
-    assignments: assignments.map((a) => ({ id: a.id, lecturerId: a.lecturerId, classGroupId: a.classGroupId, kind: a.subject.kind as Kind, sessionsPerWeek: a.sessionsPerWeek })),
+  // Xem trước kết quả phân bổ giảng viên (giai đoạn 1 của thuật toán)
+  const preview = allocateLecturers({ demands: planInput.demands, fixed: planInput.fixed, lecturers: planInput.lecturers, rooms: planInput.rooms, seed: 1 });
+  const fixedIssues = validateInput({
+    assignments: fixed.map((a) => ({ id: a.id, lecturerId: a.lecturerId, classGroupId: a.classGroupId, kind: a.subject.kind as Kind, sessionsPerWeek: a.sessionsPerWeek })),
     rooms: rooms.map((r) => ({ id: r.id, type: r.type as RoomType })),
-    requiredPerLecturer: SESSIONS_PER_LECTURER,
-    lecturerNames: Object.fromEntries(lecturers.map((l) => [l.id, l.name])),
+    lecturerNames: Object.fromEntries(staff.map((l) => [l.id, l.name])),
     classNames: Object.fromEntries(classes.map((c) => [c.id, c.code])),
   });
-
-  const byLecturer = lecturers
-    .map((l) => ({ lecturer: l, items: assignments.filter((a) => a.lecturerId === l.id) }))
-    .filter((g) => g.items.length > 0);
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+  const subjectOf = new Map(subjects.map((s) => [s.id, s]));
+  const classOf = new Map(classes.map((c) => [c.id, c]));
+  const totalDemand = plans.reduce((a, p) => a + p.sessionsPerWeek, 0);
+  const unassignedTotal = preview.unassigned.reduce((a, u) => a + u.sessions, 0);
+  const loadRows = Object.entries(preview.loads)
+    .map(([id, n]) => ({
+      id,
+      n,
+      outside: preview.allocations.filter((a) => a.lecturerId === id && a.outsideRegistration).reduce((s, a) => s + a.sessions, 0),
+      regCount: prefs.filter((p) => p.userId === id).length,
+    }))
+    .sort((a, b) => (nameOf.get(a.id) ?? "").localeCompare(nameOf.get(b.id) ?? "", "vi"));
+  const loads = loadRows.map((r) => r.n);
+  const spread = loads.length ? Math.max(...loads) - Math.min(...loads) : 0;
+  const issues = [...fixedIssues, ...preview.unassigned.map((u) => `Thiếu ${u.sessions} buổi ${subjectOf.get(u.subjectId)?.code} lớp ${classOf.get(u.classGroupId)?.code}: ${u.reason}.`)];
 
   return (
     <>
       <PageHeader
-        title="Phân công giảng dạy & dữ liệu nền"
-        description={`Thuật toán xếp lịch dùng dữ liệu này. Điều kiện: mỗi giảng viên có tổng đúng ${SESSIONS_PER_LECTURER} buổi/tuần; mỗi phân công tối đa 5 buổi (1 buổi/ngày).`}
+        title="Phân công & dữ liệu nền"
+        description="Nhập kế hoạch giảng dạy của từng lớp; thuật toán tự chọn giảng viên (ưu tiên người đã đăng ký môn, chia đều tối đa 5 buổi/người) rồi xếp lịch. Phân công cố định chỉ dùng khi muốn chỉ định đích danh."
       />
 
-      <div className={cn("mb-6 flex items-start gap-3 rounded-xl px-4 py-3 text-sm", issues.length ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")} role="status">
-        {issues.length ? <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />}
-        {issues.length ? (
-          <div>
-            <div className="font-semibold">Dữ liệu chưa đủ điều kiện xếp lịch ({issues.length} vấn đề):</div>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5">
-              {issues.map((i) => (
-                <li key={i}>{i}</li>
+      {/* ───── Dự kiến phân bổ ───── */}
+      <Card title="Dự kiến phân bổ giảng viên" className="mb-6" actions={<span className="text-xs text-ink-muted">Kết quả thực tế có thể khác chút do xếp lịch ngẫu nhiên</span>}>
+        <div className="mb-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Tổng buổi theo kế hoạch", `${totalDemand} buổi/tuần`],
+            ["Giảng viên tham gia", `${loadRows.length} người · tối đa ${loadRows.length * MAX_PER_LECTURER} buổi`],
+            ["Mức chia đều", `${preview.target} buổi/người · chênh lệch ${spread}`],
+            ["Ngoài môn đăng ký", `${preview.outsideRegistrationSessions} buổi`],
+          ].map(([k, v]) => (
+            <div key={k} className="rounded-lg bg-slate-50 px-3 py-2">
+              <div className="text-xs text-ink-muted">{k}</div>
+              <div className="font-semibold text-ink">{v}</div>
+            </div>
+          ))}
+        </div>
+        <div className={cn("mb-4 flex items-start gap-3 rounded-xl px-4 py-3 text-sm", issues.length ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")} role="status">
+          {issues.length ? <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />}
+          {issues.length ? (
+            <div>
+              <div className="font-semibold">Cần lưu ý ({issues.length}){unassignedTotal ? ` – ${unassignedTotal} buổi chưa xếp được` : ""}:</div>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {issues.slice(0, 8).map((i) => (
+                  <li key={i}>{i}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <span>Toàn bộ kế hoạch đều có giảng viên nhận – sẵn sàng xếp thời khóa biểu.</span>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="table min-w-[620px]">
+            <thead>
+              <tr>
+                <th>Giảng viên</th>
+                <th className="text-right">Số môn đăng ký</th>
+                <th className="text-right">Dự kiến (buổi/tuần)</th>
+                <th className="text-right">Ngoài đăng ký</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loadRows.map((r) => (
+                <tr key={r.id}>
+                  <td className="font-medium">{nameOf.get(r.id)}</td>
+                  <td className={cn("text-right tabular-nums", r.regCount === 0 && "font-semibold text-amber-700")}>{r.regCount === 0 ? "Chưa đăng ký" : r.regCount}</td>
+                  <td className="text-right font-semibold tabular-nums">{r.n}</td>
+                  <td className="text-right tabular-nums">{r.outside ? <Badge tone="amber">{r.outside} buổi</Badge> : "—"}</td>
+                </tr>
               ))}
-            </ul>
-          </div>
-        ) : (
-          <span>Dữ liệu hợp lệ – sẵn sàng xếp thời khóa biểu tự động ({assignments.reduce((a, x) => a + x.sessionsPerWeek, 0)} buổi/tuần).</span>
-        )}
-      </div>
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <Card title="Phân công theo giảng viên" bodyClassName="divide-y divide-line">
-          {byLecturer.map(({ lecturer, items }) => {
-            const total = items.reduce((a, x) => a + x.sessionsPerWeek, 0);
-            return (
-              <div key={lecturer.id} className="px-5 py-4 sm:px-6">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="font-semibold">{lecturer.name}</div>
-                  <Badge tone={total === SESSIONS_PER_LECTURER ? "green" : "red"}>
-                    {total}/{SESSIONS_PER_LECTURER} buổi
-                  </Badge>
-                </div>
-                <ul className="space-y-1.5">
-                  {items.map((a) => (
-                    <li key={a.id} className="flex flex-wrap items-center gap-2 text-sm">
-                      <Badge tone={a.subject.kind === "MD" ? "violet" : "blue"}>{SUBJECT_KIND[a.subject.kind].short}</Badge>
-                      <span className="min-w-0 flex-1">
-                        <span className="font-medium">{a.subject.name}</span> <span className="text-ink-muted">· {a.classGroup.code}</span>
-                      </span>
-                      <form action={updateAssignmentSessions} className="flex items-center gap-1">
-                        <input type="hidden" name="id" value={a.id} />
-                        <label htmlFor={`s-${a.id}`} className="sr-only">
-                          Số buổi/tuần
-                        </label>
-                        <select id={`s-${a.id}`} name="sessionsPerWeek" defaultValue={a.sessionsPerWeek} className="input min-h-8 w-[88px] py-1">
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <option key={n} value={n}>
-                              {n} buổi
-                            </option>
-                          ))}
-                        </select>
-                        <SubmitButton className="btn btn-ghost btn-sm" pendingText="…">
-                          Lưu
-                        </SubmitButton>
-                      </form>
-                      <form action={deleteAssignment}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <SubmitButton className="btn btn-ghost btn-sm text-red-600" confirm="Xóa phân công này? Các buổi đã xếp tương ứng cũng bị xóa.">
-                          <Trash2 className="size-4" aria-label="Xóa phân công" />
-                        </SubmitButton>
-                      </form>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </Card>
-
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-6">
-          <Card title="Thêm phân công">
-            <ActionForm action={createAssignment}>
+          {/* ───── Kế hoạch giảng dạy của lớp ───── */}
+          <Card title="Kế hoạch giảng dạy của lớp" bodyClassName="divide-y divide-line">
+            {classes.length === 0 && <p className="px-6 py-8 text-center text-sm text-ink-muted">Chưa có lớp. Thêm lớp ở khung bên phải.</p>}
+            {classes.map((c) => {
+              const items = plans.filter((p) => p.classGroupId === c.id);
+              const total = items.reduce((a, p) => a + p.sessionsPerWeek, 0);
+              return (
+                <div key={c.id} className="px-5 py-4 sm:px-6">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="font-semibold">
+                      {c.code} <span className="text-sm font-normal text-ink-muted">– {c.name}</span>
+                    </div>
+                    <Badge tone={total > 10 ? "red" : total === 0 ? "slate" : "blue"}>{total}/10 buổi</Badge>
+                  </div>
+                  {items.length === 0 ? (
+                    <p className="text-sm text-ink-muted">Chưa có môn nào.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {items.map((p) => {
+                        const regs = prefs.filter((x) => x.subjectId === p.subjectId).length;
+                        return (
+                          <li key={p.id} className="flex flex-wrap items-center gap-2 text-sm">
+                            <Badge tone={p.subject.kind === "MD" ? "violet" : "blue"}>{SUBJECT_KIND[p.subject.kind].short}</Badge>
+                            <span className="min-w-0 flex-1">
+                              <span className="font-mono text-xs">{p.subject.code}</span> <span className="font-medium">{p.subject.name}</span>
+                              {regs === 0 && <span className="ml-2 text-xs font-medium text-amber-700">· chưa ai đăng ký</span>}
+                            </span>
+                            <span className="text-ink-muted tabular-nums">{p.sessionsPerWeek} buổi/tuần</span>
+                            <form action={deleteClassSubject}>
+                              <input type="hidden" name="id" value={p.id} />
+                              <SubmitButton className="btn btn-ghost btn-sm text-red-600" confirm={`Bỏ ${p.subject.name} khỏi kế hoạch lớp ${c.code}?`}>
+                                <Trash2 className="size-4" aria-hidden />
+                                <span className="sr-only">Bỏ khỏi kế hoạch</span>
+                              </SubmitButton>
+                            </form>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </Card>
+
+          {/* ───── Đăng ký môn dạy ───── */}
+          <Card title="Đăng ký môn dạy của giảng viên" bodyClassName="overflow-x-auto">
+            <table className="table min-w-[620px]">
+              <thead>
+                <tr>
+                  <th>Học phần</th>
+                  <th>Người đã đăng ký</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subjects.map((s) => {
+                  const who = prefs.filter((p) => p.subjectId === s.id);
+                  const needed = plans.some((p) => p.subjectId === s.id);
+                  return (
+                    <tr key={s.id}>
+                      <td>
+                        <span className="font-mono text-xs">{s.code}</span> <span className="font-medium">{s.name}</span>
+                      </td>
+                      <td>
+                        {who.length ? (
+                          <span className="flex flex-wrap gap-1">
+                            {who.map((w) => (
+                              <Badge key={w.id}>{w.user.name}</Badge>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className={cn("text-sm", needed ? "font-medium text-amber-700" : "text-ink-muted")}>{needed ? "Chưa ai đăng ký (đang có lớp cần học)" : "—"}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+
+          {/* ───── Phân công cố định ───── */}
+          <Disclosure summary={`Phân công cố định – tùy chọn (${fixed.length})`}>
+            <p className="mb-4 text-sm text-ink-muted">
+              Dùng khi cần chỉ định đích danh một giảng viên cho một lớp–môn. Thuật toán giữ nguyên các phân công này và chỉ phân bổ phần còn lại. Mỗi giảng viên tối đa {MAX_PER_LECTURER} buổi/tuần.
+            </p>
+            {fixed.length > 0 && (
+              <ul className="mb-5 space-y-1.5">
+                {fixed.map((a) => (
+                  <li key={a.id} className="flex flex-wrap items-center gap-2 text-sm">
+                    <Badge tone={a.subject.kind === "MD" ? "violet" : "blue"}>{SUBJECT_KIND[a.subject.kind].short}</Badge>
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium">{a.lecturer.name}</span> · {a.subject.code} {a.subject.name} · {a.classGroup.code} · {a.sessionsPerWeek} buổi
+                    </span>
+                    <form action={deleteAssignment}>
+                      <input type="hidden" name="id" value={a.id} />
+                      <SubmitButton className="btn btn-ghost btn-sm text-red-600" confirm="Xóa phân công cố định này?">
+                        <Trash2 className="size-4" aria-hidden />
+                        <span className="sr-only">Xóa phân công</span>
+                      </SubmitButton>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <ActionForm action={createAssignment} className="grid gap-3 space-y-0 sm:grid-cols-2">
               <Field label="Giảng viên" htmlFor="lecturerId" required>
                 <select id="lecturerId" name="lecturerId" required className="input">
-                  {lecturers.map((l) => (
+                  {staff.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Lớp" htmlFor="classGroupId" required>
-                <select id="classGroupId" name="classGroupId" required className="input">
+              <Field label="Lớp" htmlFor="fx-class" required>
+                <select id="fx-class" name="classGroupId" required className="input">
                   {classes.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.code} ({c.assignments.reduce((a, x) => a + x.sessionsPerWeek, 0)}/10 buổi)
+                      {c.code}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Học phần" htmlFor="subjectId" required>
-                <select id="subjectId" name="subjectId" required className="input">
+              <Field label="Học phần" htmlFor="fx-subject" required>
+                <select id="fx-subject" name="subjectId" required className="input">
                   {subjects.map((s) => (
                     <option key={s.id} value={s.id}>
-                      [{SUBJECT_KIND[s.kind].short}] {s.name}
+                      [{SUBJECT_KIND[s.kind].short}] {s.code} {s.name}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Số buổi/tuần" htmlFor="sessionsPerWeek" required>
-                <input id="sessionsPerWeek" name="sessionsPerWeek" type="number" min={1} max={5} defaultValue={2} className="input" />
+              <Field label="Số buổi/tuần" htmlFor="fx-sessions" required>
+                <input id="fx-sessions" name="sessionsPerWeek" type="number" min={1} max={5} defaultValue={2} className="input" />
               </Field>
-              <SubmitButton>Thêm phân công</SubmitButton>
+              <div className="sm:col-span-2">
+                <SubmitButton className="btn btn-secondary">Thêm phân công cố định</SubmitButton>
+              </div>
+            </ActionForm>
+          </Disclosure>
+        </div>
+
+        <div className="space-y-6">
+          <Card title="Thêm môn vào kế hoạch lớp">
+            <ActionForm action={saveClassSubject}>
+              <Field label="Lớp" htmlFor="cs-class" required>
+                <select id="cs-class" name="classGroupId" required className="input">
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} ({plans.filter((p) => p.classGroupId === c.id).reduce((a, p) => a + p.sessionsPerWeek, 0)}/10 buổi)
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Học phần" htmlFor="cs-subject" required>
+                <select id="cs-subject" name="subjectId" required className="input">
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      [{SUBJECT_KIND[s.kind].short}] {s.code} {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Số buổi/tuần" htmlFor="cs-sessions" hint="Nếu môn đã có trong kế hoạch lớp, số buổi sẽ được cập nhật." required>
+                <input id="cs-sessions" name="sessionsPerWeek" type="number" min={1} max={5} defaultValue={2} className="input" />
+              </Field>
+              <SubmitButton>Lưu vào kế hoạch</SubmitButton>
             </ActionForm>
           </Card>
 
           <Disclosure summary={`Phòng học (${rooms.length})`}>
-            <ul className="mb-4 flex flex-wrap gap-1.5">
+            <ul className="mb-4 divide-y divide-line rounded-lg border border-line">
               {rooms.map((r) => (
-                <li key={r.id}>
-                  <Badge tone={r.type === "LAB" ? "violet" : "blue"}>
-                    {r.code} · {r.type === "LAB" ? "TH" : "LT"}
-                  </Badge>
+                <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+                  <span>
+                    <span className="font-medium">{r.code}</span> <span className="text-ink-muted">· {r.type === "LAB" ? "Thực hành" : "Lý thuyết"} · {r.capacity} chỗ</span>
+                  </span>
+                  <DeleteButton action={deleteRoom} id={r.id} label={`Xóa phòng ${r.code}`} confirm={`Xóa phòng ${r.code}?`} />
                 </li>
               ))}
             </ul>
@@ -174,10 +329,13 @@ export default async function AssignmentsPage() {
           </Disclosure>
 
           <Disclosure summary={`Lớp học (${classes.length})`}>
-            <ul className="mb-4 flex flex-wrap gap-1.5">
+            <ul className="mb-4 divide-y divide-line rounded-lg border border-line">
               {classes.map((c) => (
-                <li key={c.id}>
-                  <Badge>{c.code}</Badge>
+                <li key={c.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+                  <span>
+                    <span className="font-medium">{c.code}</span> <span className="text-ink-muted">· {c.size} SV</span>
+                  </span>
+                  <DeleteButton action={deleteClassGroup} id={c.id} label={`Xóa lớp ${c.code}`} confirm={`Xóa lớp ${c.code}? Kế hoạch giảng dạy và phân công cố định của lớp cũng bị xóa.`} />
                 </li>
               ))}
             </ul>
@@ -198,11 +356,18 @@ export default async function AssignmentsPage() {
           </Disclosure>
 
           <Disclosure summary={`Học phần (${subjects.length})`}>
-            <ul className="mb-4 space-y-1 text-sm">
+            <ul className="mb-4 divide-y divide-line rounded-lg border border-line">
               {subjects.map((s) => (
-                <li key={s.id} className="flex items-center gap-2">
-                  <Badge tone={s.kind === "MD" ? "violet" : "blue"}>{SUBJECT_KIND[s.kind].short}</Badge>
-                  <span className="font-mono text-xs">{s.code}</span> {s.name}
+                <li key={s.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+                  <span className="min-w-0">
+                    <Badge tone={s.kind === "MD" ? "violet" : "blue"}>{SUBJECT_KIND[s.kind].short}</Badge> <span className="font-mono text-xs">{s.code}</span> {s.name}
+                  </span>
+                  <DeleteButton
+                    action={deleteSubject}
+                    id={s.id}
+                    label={`Xóa học phần ${s.code}`}
+                    confirm={`Xóa học phần ${s.code} ${s.name}? Kế hoạch, phân công cố định và đăng ký môn liên quan cũng bị xóa.`}
+                  />
                 </li>
               ))}
             </ul>

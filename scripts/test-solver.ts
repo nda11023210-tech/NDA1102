@@ -1,5 +1,5 @@
 // Kiểm thử thuật toán xếp TKB: npm run test:solver
-import { findConflicts, solveTimetable, validateInput, type SchedAssignment, type SchedRoom } from "../src/lib/scheduler";
+import { findConflicts, mulberry32, planTimetable, preferredSlots, type Demand, type Kind, type LecturerInfo, type SchedRoom } from "../src/lib/scheduler";
 
 let failed = 0;
 const check = (name: string, cond: boolean, detail = "") => {
@@ -7,57 +7,115 @@ const check = (name: string, cond: boolean, detail = "") => {
   if (!cond) failed++;
 };
 
-// Dữ liệu: 12 GV × 5 buổi = 60 buổi, 8 lớp, 5 phòng LAB + 5 phòng lý thuyết
-const rooms: SchedRoom[] = [
-  ...Array.from({ length: 5 }, (_, i) => ({ id: `LAB${i}`, type: "LAB" as const })),
-  ...Array.from({ length: 5 }, (_, i) => ({ id: `LT${i}`, type: "THEORY" as const })),
+const rooms = (lab: number, theory: number): SchedRoom[] => [
+  ...Array.from({ length: lab }, (_, i) => ({ id: `LAB${i}`, type: "LAB" as const })),
+  ...Array.from({ length: theory }, (_, i) => ({ id: `LT${i}`, type: "THEORY" as const })),
 ];
-const assignments: SchedAssignment[] = [];
-const splits = [[3, 2], [2, 2, 1], [3, 2], [2, 3], [1, 2, 2], [3, 2], [2, 2, 1], [2, 3], [3, 2], [2, 1, 2], [3, 2], [2, 3]];
-let cls = 0;
-splits.forEach((parts, gv) => {
-  parts.forEach((n, k) => {
-    assignments.push({ id: `A${gv}-${k}`, lecturerId: `GV${gv}`, classGroupId: `L${cls++ % 8}`, kind: (gv + k) % 2 ? "MD" : "MH", sessionsPerWeek: n });
-  });
-});
+// 12 học phần: S0–S5 là Môn học (MH), S6–S11 là Mô-đun (MĐ)
+const kindOf = (s: number): Kind => (s < 6 ? "MH" : "MD");
+// 12 giảng viên, mỗi người đăng ký 2 môn (mỗi môn có đúng 2 người đăng ký)
+const lecturers: LecturerInfo[] = Array.from({ length: 12 }, (_, i) => ({ id: `GV${i}`, registered: [`S${i}`, `S${(i + 6) % 12}`] }));
 
-check("Dữ liệu đầu vào hợp lệ", validateInput({ assignments, rooms }).length === 0, validateInput({ assignments, rooms }).join("; "));
-
-for (let seed = 1; seed <= 20; seed++) {
-  const r = solveTimetable({ assignments, rooms, seed });
-  if (!r.ok) {
-    check(`Seed ${seed}: tìm được lời giải`, false, r.errors.join("; "));
-    continue;
+/** Tạo kế hoạch: `total` buổi rải trên 8 lớp, mỗi dòng 1–3 buổi */
+function makeDemands(total: number): Demand[] {
+  const out: Demand[] = [];
+  let left = total;
+  let k = 0;
+  while (left > 0) {
+    const n = Math.min(left, (k % 3) + 1);
+    const s = k % 12;
+    out.push({ classGroupId: `L${k % 8}`, subjectId: `S${s}`, kind: kindOf(s), sessions: n });
+    left -= n;
+    k++;
   }
-  const withIds = r.entries.map((e, i) => ({ ...e, id: String(i) }));
-  const conflicts = findConflicts(withIds, new Map(assignments.map((a) => [a.id, a])), rooms);
+  return out;
+}
+
+function analyse(res: ReturnType<typeof planTimetable>) {
+  const asg = new Map(res.allocation.allocations.map((a) => [a.key, { id: a.key, lecturerId: a.lecturerId, classGroupId: a.classGroupId, kind: a.kind, sessionsPerWeek: a.sessions }]));
+  const conflicts = findConflicts(res.entries.map((e, i) => ({ ...e, id: String(i) })), asg, rooms(5, 5));
   const perLec = new Map<string, number>();
-  for (const e of r.entries) {
-    const a = assignments.find((x) => x.id === e.assignmentId)!;
-    perLec.set(a.lecturerId, (perLec.get(a.lecturerId) ?? 0) + 1);
+  for (const e of res.entries) {
+    const l = asg.get(e.assignmentId)!.lecturerId;
+    perLec.set(l, (perLec.get(l) ?? 0) + 1);
   }
-  const exact5 = [...perLec.values()].every((n) => n === 5) && perLec.size === 12;
+  const loads = lecturers.map((l) => perLec.get(l.id) ?? 0);
+  return { conflicts: conflicts.size, min: Math.min(...loads), max: Math.max(...loads), loads };
+}
+
+// 1. Đủ nhu cầu (60 buổi = 12 GV × 5): ai cũng đúng 5 buổi
+for (const seed of [1, 2, 3, 4, 5]) {
+  const r = planTimetable({ demands: makeDemands(60), lecturers, rooms: rooms(5, 5), seed });
+  const a = analyse(r);
   check(
-    `Seed ${seed}: ${r.entries.length} buổi, 0 xung đột, mỗi GV đúng 5 buổi`,
-    r.entries.length === 60 && conflicts.size === 0 && exact5,
-    `${r.stats.ms}ms, ${r.stats.steps} bước, ${r.stats.lecturerDoubleDays} ngày GV dạy 2 buổi`,
+    `Đủ lớp (seed ${seed}): 60 buổi, 0 xung đột, mỗi GV đúng 5 buổi`,
+    r.ok && r.entries.length === 60 && a.conflicts === 0 && a.min === 5 && a.max === 5,
+    `${r.stats.ms}ms · ngoài đăng ký ${r.allocation.outsideRegistrationSessions} buổi · GV không trọn buổi ${r.stats.mixedLecturers}`,
   );
 }
 
-// GV sai số buổi phải bị từ chối
-const bad = assignments.map((a) => (a.id === "A0-0" ? { ...a, sessionsPerWeek: 2 } : a));
-check("Phát hiện GV không đủ 5 buổi", validateInput({ assignments: bad, rooms }).some((e) => e.includes("GV0")));
+// 2. Thiếu lớp (40 buổi cho 12 GV): chia đều, chênh lệch tối đa 1 buổi
+for (const seed of [1, 2, 3]) {
+  const r = planTimetable({ demands: makeDemands(40), lecturers, rooms: rooms(5, 5), seed });
+  const a = analyse(r);
+  check(`Thiếu lớp (seed ${seed}): chia đều 40 buổi`, r.ok && a.conflicts === 0 && a.max - a.min <= 1, `số buổi mỗi GV: ${a.loads.join(",")}`);
+}
 
-// Buổi khóa được giữ nguyên
-const lockedRes = solveTimetable({ assignments, rooms, seed: 3, locked: [{ assignmentId: "A0-0", day: 4, slot: 1, roomId: "LT0" }] });
-check(
-  "Giữ nguyên buổi đã khóa",
-  lockedRes.ok && lockedRes.entries.some((e) => e.assignmentId === "A0-0" && e.day === 4 && e.slot === 1 && e.roomId === "LT0" && e.locked),
-);
+// 3. Ưu tiên môn đăng ký: khi người đăng ký đủ sức nhận, không giao môn cho người chưa đăng ký.
+//    Mỗi GV đăng ký 3 môn (mỗi môn 3 người), mỗi môn cần đúng 4 buổi → 48 buổi, mỗi người 4 buổi.
+{
+  const wide: LecturerInfo[] = Array.from({ length: 12 }, (_, i) => ({ id: `GV${i}`, registered: [0, 4, 8].map((o) => `S${(i + o) % 12}`) }));
+  const demands: Demand[] = Array.from({ length: 12 }, (_, s) => [0, 1].map((c) => ({ classGroupId: `L${(s + c * 4) % 8}`, subjectId: `S${s}`, kind: kindOf(s), sessions: 2 }))).flat();
+  const r = planTimetable({ demands, lecturers: wide, rooms: rooms(5, 5), seed: 7 });
+  check("Ưu tiên môn đã đăng ký", r.ok && r.allocation.outsideRegistrationSessions === 0, `ngoài đăng ký: ${r.allocation.outsideRegistrationSessions} buổi`);
+}
 
-// Thiếu phòng thực hành phải báo lỗi
-const fewLabs = rooms.filter((r) => r.type === "THEORY" || r.id === "LAB0");
-check("Báo lỗi khi thiếu phòng thực hành", !solveTimetable({ assignments, rooms: fewLabs }).ok);
+// 4. Toàn buổi sáng hoặc toàn buổi chiều: khi tồn tại cách chia ca khả thi thì không GV nào bị tách ca
+{
+  let feasibleRuns = 0;
+  let mixedWhenFeasible = 0;
+  let mixedOther = 0;
+  for (const seed of [1, 2, 3, 4, 5, 11, 12, 13, 14, 15]) {
+    const r = planTimetable({ demands: makeDemands(60), lecturers, rooms: rooms(5, 5), seed });
+    const asg = r.allocation.allocations.map((a) => ({ id: a.key, lecturerId: a.lecturerId, classGroupId: a.classGroupId, kind: a.kind, sessionsPerWeek: a.sessions }));
+    const { overflow } = preferredSlots(asg, rooms(5, 5), mulberry32(seed));
+    if (overflow === 0) {
+      feasibleRuns++;
+      mixedWhenFeasible += r.stats.mixedLecturers;
+    } else mixedOther += r.stats.mixedLecturers;
+  }
+  check(
+    "Mỗi GV dạy trọn buổi sáng hoặc trọn buổi chiều (khi khả thi)",
+    feasibleRuns > 0 && mixedWhenFeasible === 0,
+    `${feasibleRuns}/10 lần khả thi → 0 GV tách ca; các lần không khả thi: tổng ${mixedOther} GV phải tách ca`,
+  );
+}
+
+// 5. Thiếu phòng: không vượt sức chứa, chia đều phần xếp được, báo phần còn thiếu
+{
+  const r = planTimetable({ demands: makeDemands(60), lecturers, rooms: rooms(2, 3), seed: 3 });
+  const a = analyse(r);
+  check(
+    "Thiếu phòng: xếp tối đa 50 buổi, chia đều, báo phần thiếu",
+    r.ok && r.entries.length === 50 && a.max - a.min <= 1 && r.allocation.unassigned.length > 0 && a.conflicts === 0,
+    `đã xếp ${r.entries.length} buổi, GV: ${a.loads.join(",")}`,
+  );
+}
+
+// 6. Phân công cố định và buổi khóa được giữ nguyên
+{
+  const r = planTimetable({
+    demands: makeDemands(60),
+    lecturers,
+    rooms: rooms(5, 5),
+    fixed: [{ lecturerId: "GV3", classGroupId: "L0", subjectId: "S0", kind: "MH", sessions: 2 }],
+    locked: [{ lecturerId: "GV0", classGroupId: "L1", subjectId: "S1", kind: "MH", day: 4, slot: 1, roomId: "LT0" }],
+    seed: 9,
+  });
+  const keptFixed = r.allocation.allocations.some((a) => a.key === "GV3|L0|S0" && a.fixed && a.sessions >= 2);
+  const keptLock = r.entries.some((e) => e.assignmentId === "GV0|L1|S1" && e.day === 4 && e.slot === 1 && e.roomId === "LT0" && e.locked);
+  check("Giữ phân công cố định và buổi đã khóa", r.ok && keptFixed && keptLock);
+}
 
 console.log(failed ? `\n${failed} kiểm thử thất bại` : "\nTất cả kiểm thử đều đạt");
 process.exit(failed ? 1 : 0);

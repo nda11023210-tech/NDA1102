@@ -7,9 +7,10 @@ import { ASSET_CATEGORY, ASSET_STATUS, INVENTORY_CONDITION, LOAN_STATUS } from "
 import { fmtDate, fmtDateTime, fmtMoney, toLocalInput } from "@/lib/utils";
 import { Badge, Card, Field, PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { recordInventory, requestLoan, updateAsset } from "../actions";
+import { deleteAsset, recordInventory, requestLoan, updateAsset } from "../actions";
+import { DeleteButton } from "@/components/delete-button";
 
-export const metadata = { title: "Chi tiết tài sản" };
+export const metadata = { title: "Chi tiết thiết bị" };
 
 export default async function AssetDetail({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
@@ -36,7 +37,19 @@ export default async function AssetDetail({ params }: { params: Promise<{ code: 
     <>
       <PageHeader
         title={asset.name}
-        back={{ href: "/tai-san", label: "Danh mục tài sản" }}
+        back={{ href: "/tai-san", label: "Danh mục thiết bị" }}
+        actions={
+          manager && (
+            <DeleteButton
+              action={deleteAsset}
+              id={asset.id}
+              fields={{ from: "detail" }}
+              text="Xóa thiết bị"
+              label={`Xóa thiết bị ${asset.code}`}
+              confirm={`Xóa thiết bị ${asset.code} – ${asset.name}? Toàn bộ lịch sử mượn/trả và kiểm kê của thiết bị cũng bị xóa. Nếu chỉ ngừng sử dụng, nên chuyển trạng thái sang “Thanh lý”.`}
+            />
+          )
+        }
         description={
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-mono font-semibold text-ink">{asset.code}</span>
@@ -90,10 +103,10 @@ export default async function AssetDetail({ params }: { params: Promise<{ code: 
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          <Card title="Thông tin tài sản">
+          <Card title="Thông tin thiết bị">
             <dl className="grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
               {[
-                ["Mã tài sản", <span key="c" className="font-mono">{asset.code}</span>],
+                ["Mã thiết bị", <span key="c" className="font-mono">{asset.code}</span>],
                 ["Loại", ASSET_CATEGORY[asset.category]],
                 ["Vị trí", asset.location],
                 ["Số serial", asset.serial ?? "—"],
@@ -183,31 +196,59 @@ export default async function AssetDetail({ params }: { params: Promise<{ code: 
           ) : (
             <Card>
               <p className="text-sm text-ink-muted">
-                Tài sản đang ở trạng thái <Badge tone={ASSET_STATUS[asset.status].tone}>{ASSET_STATUS[asset.status].label}</Badge>, tạm thời không nhận yêu cầu mượn.
+                Thiết bị đang ở trạng thái <Badge tone={ASSET_STATUS[asset.status].tone}>{ASSET_STATUS[asset.status].label}</Badge>, tạm thời không nhận yêu cầu mượn.
               </p>
             </Card>
           )}
 
           {manager && (
-            <Card title="Cập nhật tình trạng">
+            <Card title={<span id="sua" className="scroll-mt-6">Sửa thông tin thiết bị</span>}>
               <ActionForm action={updateAsset} resetOnSuccess={false}>
                 <input type="hidden" name="id" value={asset.id} />
-                <Field label="Trạng thái" htmlFor="status">
-                  <select id="status" name="status" defaultValue={asset.status} className="input">
-                    {Object.entries(ASSET_STATUS).map(([k, v]) => (
-                      <option key={k} value={k}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
+                <Field label="Mã thiết bị" htmlFor="code" hint="Đổi mã thì cần in lại tem QR." required>
+                  <input id="code" name="code" required defaultValue={asset.code} className="input uppercase" />
                 </Field>
+                <Field label="Tên thiết bị" htmlFor="name" required>
+                  <input id="name" name="name" required defaultValue={asset.name} className="input" />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Loại" htmlFor="category">
+                    <select id="category" name="category" defaultValue={asset.category} className="input">
+                      {Object.entries(ASSET_CATEGORY).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Trạng thái" htmlFor="status">
+                    <select id="status" name="status" defaultValue={asset.status} className="input">
+                      {Object.entries(ASSET_STATUS).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
                 <Field label="Vị trí" htmlFor="location">
                   <input id="location" name="location" defaultValue={asset.location} className="input" />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Số serial" htmlFor="serial">
+                    <input id="serial" name="serial" defaultValue={asset.serial ?? ""} className="input" />
+                  </Field>
+                  <Field label="Ngày mua" htmlFor="purchaseDate">
+                    <input id="purchaseDate" name="purchaseDate" type="date" defaultValue={asset.purchaseDate ? toLocalInput(asset.purchaseDate).slice(0, 10) : ""} className="input" />
+                  </Field>
+                </div>
+                <Field label="Nguyên giá (VNĐ)" htmlFor="value">
+                  <input id="value" name="value" inputMode="numeric" defaultValue={asset.value ?? ""} className="input" />
                 </Field>
                 <Field label="Ghi chú" htmlFor="note">
                   <textarea id="note" name="note" rows={2} defaultValue={asset.note ?? ""} className="input" />
                 </Field>
-                <SubmitButton className="btn btn-secondary w-full">Lưu</SubmitButton>
+                <SubmitButton className="btn btn-primary w-full">Lưu thay đổi</SubmitButton>
               </ActionForm>
             </Card>
           )}

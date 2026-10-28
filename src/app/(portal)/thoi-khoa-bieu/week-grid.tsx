@@ -40,19 +40,35 @@ export function WeekGrid({ entries, show }: { entries: LoadedEntry[]; show: "lec
                             )}
                           >
                             <div className="flex items-start justify-between gap-1">
-                              <div className="line-clamp-2 text-[13px] leading-snug font-semibold text-ink">{e.assignment.subject.name}</div>
+                              <div className="text-[13px] leading-snug font-semibold text-ink">
+                                <span className="font-mono">{e.assignment.subject.code}</span> · {e.assignment.subject.name}
+                              </div>
                               {e.locked && <Lock className="mt-0.5 size-3 shrink-0 text-ink-muted" aria-label="Đã khóa" />}
                             </div>
                             <div className="mt-1 text-xs text-ink-muted">
                               {SUBJECT_KIND[kind].short} · {slotTime(slot, kind)}
                             </div>
-                            <div className="mt-0.5 text-xs font-medium text-ink-soft">
-                              {show !== "class" && <span>{e.assignment.classGroup.code}</span>}
-                              {show !== "class" && " · "}
-                              {show !== "room" && <span>P.{e.room.code}</span>}
-                              {show === "room" && <span>{e.assignment.classGroup.code}</span>}
-                            </div>
-                            {show !== "lecturer" && <div className="mt-0.5 truncate text-xs text-ink-muted">{e.assignment.lecturer.name}</div>}
+                            <dl className="mt-1 space-y-0.5 text-xs text-ink-soft">
+                              <div>
+                                <dt className="inline text-ink-muted">Lớp: </dt>
+                                <dd className="inline font-medium">
+                                  {e.assignment.classGroup.code} – {e.assignment.classGroup.name}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="inline text-ink-muted">Phòng: </dt>
+                                <dd className="inline font-medium">
+                                  {e.room.code}
+                                  {!e.room.name.includes(e.room.code) ? ` (${e.room.name})` : ""}
+                                </dd>
+                              </div>
+                              {show !== "lecturer" && (
+                                <div>
+                                  <dt className="inline text-ink-muted">GV: </dt>
+                                  <dd className="inline font-medium">{e.assignment.lecturer.name}</dd>
+                                </div>
+                              )}
+                            </dl>
                           </div>
                         );
                       })}
