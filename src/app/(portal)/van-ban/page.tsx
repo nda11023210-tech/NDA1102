@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText, Plus, Paperclip, PenLine, Search, CheckCircle2 } from "lucide-react";
+import { FileText, Plus, Paperclip, PenLine, Pencil, Search, CheckCircle2 } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { requireUser, isManager } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -7,7 +7,8 @@ import { cn, fmtDate } from "@/lib/utils";
 import type { Tone } from "@/lib/constants";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { ActionForm, Disclosure, SubmitButton } from "@/components/forms";
-import { createCategory } from "./actions";
+import { createCategory, deleteCategory, deleteDocumentAction, updateCategory } from "./actions";
+import { DeleteButton } from "@/components/delete-button";
 
 export const metadata = { title: "Văn bản & Thông báo" };
 
@@ -109,10 +110,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
             const signedCount = d.receipts.filter((r) => r.signedAt).length;
             const unread = !mine?.readAt;
             return (
+              <div key={d.id} className="flex items-stretch transition-colors hover:bg-slate-50">
               <Link
-                key={d.id}
                 href={`/van-ban/${d.id}`}
-                className="flex flex-col gap-2 px-5 py-4 transition-colors hover:bg-slate-50 sm:flex-row sm:items-center sm:gap-5 sm:px-6"
+                className="flex min-w-0 flex-1 flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:gap-5 sm:px-6"
               >
                 <div className="flex min-w-0 flex-1 items-start gap-3">
                   <span className={cn("mt-2 size-2 shrink-0 rounded-full", unread ? "bg-action" : "bg-transparent")} aria-hidden />
@@ -151,6 +152,15 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                   <time className="w-[84px] text-right tabular-nums">{fmtDate(d.issuedAt)}</time>
                 </div>
               </Link>
+              {manager && (
+                <div className="flex shrink-0 items-start gap-1 py-3 pr-3 sm:items-center sm:py-0">
+                  <Link href={`/van-ban/${d.id}/sua`} className="btn btn-ghost btn-sm" aria-label={`Sửa văn bản ${d.title}`}>
+                    <Pencil className="size-4" aria-hidden />
+                  </Link>
+                  <DeleteButton action={deleteDocumentAction} id={d.id} label={`Xóa văn bản ${d.title}`} confirm={`Xóa văn bản “${d.title}” cùng tệp đính kèm và dữ liệu đọc/ký nhận?`} />
+                </div>
+              )}
+              </div>
             );
           })
         )}
@@ -158,6 +168,37 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
       {manager && (
         <Disclosure summary="Quản lý danh mục văn bản" className="mt-6">
+          <ul className="mb-5 divide-y divide-line rounded-lg border border-line">
+            {categories.map((c) => (
+              <li key={c.id} className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-start">
+                <ActionForm action={updateCategory} resetOnSuccess={false} className="flex flex-1 flex-col gap-2 space-y-0 sm:flex-row sm:items-start">
+                  <input type="hidden" name="id" value={c.id} />
+                  <label htmlFor={`cat-${c.id}`} className="sr-only">
+                    Tên danh mục
+                  </label>
+                  <input id={`cat-${c.id}`} name="name" defaultValue={c.name} required className="input flex-1" />
+                  <label htmlFor={`col-${c.id}`} className="sr-only">
+                    Màu nhãn
+                  </label>
+                  <select id={`col-${c.id}`} name="color" defaultValue={c.color} className="input sm:w-36">
+                    <option value="blue">Xanh dương</option>
+                    <option value="green">Xanh lá</option>
+                    <option value="amber">Vàng</option>
+                    <option value="red">Đỏ</option>
+                    <option value="violet">Tím</option>
+                    <option value="slate">Xám</option>
+                  </select>
+                  <SubmitButton className="btn btn-secondary" pendingText="…">
+                    Lưu
+                  </SubmitButton>
+                </ActionForm>
+                <div className="flex items-center gap-2 sm:pt-1">
+                  <span className="text-xs text-ink-muted tabular-nums">{c._count.documents} VB</span>
+                  <DeleteButton action={deleteCategory} id={c.id} label={`Xóa danh mục ${c.name}`} confirm={`Xóa danh mục “${c.name}”?`} />
+                </div>
+              </li>
+            ))}
+          </ul>
           <ActionForm action={createCategory} className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-end">
             <div className="flex-1">
               <label htmlFor="cat-name" className="label">

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ClipboardCheck, CalendarClock, Building2 } from "lucide-react";
+import { ClipboardCheck, CalendarClock, Building2, Pencil } from "lucide-react";
 import { requireUser, isManager } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cn, fmtDate, fmtRelative, toLocalInput } from "@/lib/utils";
 import { Badge, EmptyState, Field, PageHeader, ProgressBar } from "@/components/ui";
 import { ActionForm, Disclosure, SubmitButton } from "@/components/forms";
-import { createCampaign } from "./actions";
+import { createCampaign, deleteCampaign } from "./actions";
+import { DeleteButton } from "@/components/delete-button";
 
 export const metadata = { title: "Minh chứng Sở ban ngành" };
 
@@ -76,7 +77,8 @@ export default async function CampaignsPage() {
             const mine = c.evidences.filter((e) => e.submitterId === user.id).length;
             const pct = (covered / Math.max(1, c.criteria.length)) * 100;
             return (
-              <Link key={c.id} href={`/minh-chung/${c.id}`} className="card card-pad flex flex-col gap-4 transition-shadow duration-200 hover:shadow-md">
+              <div key={c.id} className="card flex flex-col transition-shadow duration-200 hover:shadow-md">
+              <Link href={`/minh-chung/${c.id}`} className="card-pad flex flex-1 flex-col gap-4 rounded-xl">
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="font-semibold text-ink text-balance">{c.title}</h2>
                   {open ? <Badge tone="green">Đang mở</Badge> : c.closeAt < now ? <Badge tone="slate">Đã đóng</Badge> : <Badge tone="blue">Sắp mở</Badge>}
@@ -104,6 +106,20 @@ export default async function CampaignsPage() {
                   </div>
                 </div>
               </Link>
+              {manager && (
+                <div className="flex items-start justify-end gap-1 border-t border-line px-4 py-2">
+                  <Link href={`/minh-chung/${c.id}/sua`} className="btn btn-ghost btn-sm">
+                    <Pencil className="size-4" aria-hidden /> Sửa
+                  </Link>
+                  <DeleteButton
+                    action={deleteCampaign}
+                    id={c.id}
+                    label={`Xóa đợt ${c.title}`}
+                    confirm={`Xóa đợt “${c.title}”? Toàn bộ ${c.criteria.length} tiêu chí, ${c.evidences.length} minh chứng, lịch sử duyệt và tệp đính kèm sẽ bị xóa vĩnh viễn.`}
+                  />
+                </div>
+              )}
+              </div>
             );
           })}
         </div>

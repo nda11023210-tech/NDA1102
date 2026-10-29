@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-export function SignToggle() {
-  const [on, setOn] = useState(false);
+export function SignToggle({ defaultOn = false, defaultDue = "" }: { defaultOn?: boolean; defaultDue?: string }) {
+  const [on, setOn] = useState(defaultOn);
   return (
     <div className="rounded-xl border border-line bg-slate-50 p-4">
       <label className="flex cursor-pointer items-start gap-3">
@@ -18,7 +18,7 @@ export function SignToggle() {
           <label htmlFor="signDueAt" className="label">
             Hạn ký nhận
           </label>
-          <input id="signDueAt" name="signDueAt" type="datetime-local" className="input" />
+          <input id="signDueAt" name="signDueAt" type="datetime-local" defaultValue={defaultDue} className="input" />
         </div>
       )}
     </div>

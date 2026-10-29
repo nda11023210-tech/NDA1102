@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Pencil } from "lucide-react";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
@@ -7,6 +9,8 @@ import { ROLES, ROLE_LABEL, normalizeRole, type Role } from "@/lib/constants";
 import { str } from "@/lib/utils";
 import { Avatar, Badge, Card, Field, PageHeader } from "@/components/ui";
 import { ActionForm, Disclosure, SubmitButton } from "@/components/forms";
+import { DeleteButton } from "@/components/delete-button";
+import { deleteUser } from "./actions";
 
 export const metadata = { title: "Người dùng" };
 
@@ -90,7 +94,7 @@ export default async function UsersPage() {
 
       <Card bodyClassName="overflow-x-auto">
         {users.length > 0 && (
-          <table className="table min-w-[760px]">
+          <table className="table min-w-[860px]">
             <thead>
               <tr>
                 <th>Người dùng</th>
@@ -133,7 +137,10 @@ export default async function UsersPage() {
                   </td>
                   <td>{u.active ? <Badge tone="green">Hoạt động</Badge> : <Badge tone="red">Đã khóa</Badge>}</td>
                   <td>
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-start justify-end gap-1">
+                      <Link href={`/nguoi-dung/${u.id}`} className="btn btn-ghost btn-sm">
+                        <Pencil className="size-4" aria-hidden /> Sửa
+                      </Link>
                       <form action={updateUser}>
                         <input type="hidden" name="id" value={u.id} />
                         <input type="hidden" name="intent" value="reset" />
@@ -149,6 +156,14 @@ export default async function UsersPage() {
                             {u.active ? "Khóa" : "Mở khóa"}
                           </SubmitButton>
                         </form>
+                      )}
+                      {u.id !== me.id && (
+                        <DeleteButton
+                          action={deleteUser}
+                          id={u.id}
+                          label={`Xóa tài khoản ${u.name}`}
+                          confirm={`Xóa vĩnh viễn tài khoản ${u.name}? (Chỉ xóa được tài khoản chưa phát sinh dữ liệu.)`}
+                        />
                       )}
                     </div>
                   </td>

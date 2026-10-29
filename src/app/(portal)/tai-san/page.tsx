@@ -53,7 +53,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
         <StatCard icon={HandHelping} label="Đang cho mượn" value={count("BORROWED")} tone="violet" href="/tai-san?st=BORROWED" />
         <StatCard
           icon={count("BROKEN") > 0 ? AlertTriangle : Wrench}
-          label="Bảo trì / Hỏng"
+          label="Tình trạng"
           value={count("MAINTENANCE") + count("BROKEN")}
           tone="amber"
           href="/tai-san?st=BROKEN"

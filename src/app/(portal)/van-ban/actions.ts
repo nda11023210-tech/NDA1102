@@ -87,3 +87,89 @@ export async function createCategory(_: ActionState, fd: FormData): Promise<Acti
     return ok(`Đã thêm danh mục “${name}”.`);
   });
 }
+
+/**
+ * Sửa văn bản: nội dung, danh mục, yêu cầu ký nhận; thêm tệp mới và gỡ tệp cũ.
+ * Nếu tích "Yêu cầu ký nhận lại", mọi chữ ký cũ bị hủy (giữ trạng thái đã đọc) để mọi người ký bản mới.
+ */
+export async function updateDocument(_: ActionState, fd: FormData): Promise<ActionState> {
+  let id = "";
+  const res = await attempt(async () => {
+    const user = await requireRole("MANAGER");
+    id = str(fd, "id");
+    const title = str(fd, "title");
+    const categoryId = str(fd, "categoryId");
+    if (!title || !categoryId) return fail("Vui lòng nhập tiêu đề và chọn danh mục.");
+    const requireSign = fd.get("requireSign") === "on";
+    await db.document.update({
+      where: { id },
+      data: {
+        title,
+        categoryId,
+        number: str(fd, "number") || null,
+        summary: str(fd, "summary") || null,
+        content: str(fd, "content") || null,
+        issuedAt: fromLocalInput(str(fd, "issuedAt")) ?? undefined,
+        requireSign,
+        signDueAt: requireSign ? fromLocalInput(str(fd, "signDueAt")) : null,
+      },
+    });
+    // Gỡ tệp được chọn
+    const removeIds = fd.getAll("removeAttachment").map(String);
+    if (removeIds.length) {
+      const files = await db.attachment.findMany({ where: { id: { in: removeIds }, documentId: id } });
+      await db.attachment.deleteMany({ where: { id: { in: files.map((f) => f.id) } } });
+      await Promise.all(files.map((f) => deleteUpload(f.storedName)));
+    }
+    await saveUploads(fd, user.id, { documentId: id });
+    if (fd.get("resetSignatures") === "on") {
+      await db.documentReceipt.updateMany({ where: { documentId: id }, data: { signedAt: null, signatureName: null, signatureIp: null } });
+    }
+    return ok("Đã cập nhật văn bản.");
+  });
+  if (res?.ok) {
+    revalidatePath("/van-ban");
+    revalidatePath(`/van-ban/${id}`);
+    redirect(`/van-ban/${id}`);
+  }
+  return res;
+}
+
+/** Xóa văn bản (dùng cho nút xóa có hiển thị lỗi) */
+export async function deleteDocumentAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const res = await attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const files = await db.attachment.findMany({ where: { documentId: id } });
+    const d = await db.document.delete({ where: { id } });
+    await Promise.all(files.map((f) => deleteUpload(f.storedName)));
+    revalidatePath("/van-ban");
+    return ok(`Đã xóa văn bản “${d.title}”.`);
+  });
+  if (res?.ok && str(fd, "from") === "detail") redirect("/van-ban");
+  return res;
+}
+
+export async function updateCategory(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const name = str(fd, "name");
+    if (!name) return fail("Vui lòng nhập tên danh mục.");
+    await db.docCategory.update({ where: { id }, data: { name, color: str(fd, "color") || "blue" } });
+    revalidatePath("/van-ban");
+    return ok("Đã lưu danh mục.");
+  });
+}
+
+export async function deleteCategory(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const n = await db.document.count({ where: { categoryId: id } });
+    if (n) return fail(`Danh mục đang có ${n} văn bản – hãy chuyển hoặc xóa các văn bản đó trước.`);
+    await db.docCategory.delete({ where: { id } });
+    revalidatePath("/van-ban");
+    return ok("Đã xóa danh mục.");
+  });
+}

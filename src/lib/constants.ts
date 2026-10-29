@@ -87,8 +87,8 @@ export const SUBJECT_KIND: Record<string, { label: string; short: string; hours:
 export const DAYS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6"];
 /** Giờ bắt đầu mỗi ca (giờ thập phân). Kết thúc = bắt đầu + 6 giờ (MĐ) hoặc 5 giờ (MH) */
 export const SLOTS = [
-  { label: "Sáng", start: 6.5 },
-  { label: "Chiều", start: 13 },
+  { label: "Sáng", start: 7 },
+  { label: "Chiều", start: 12.5 },
 ];
 
 export function slotTime(slot: number, kind: string) {

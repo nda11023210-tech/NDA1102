@@ -1,12 +1,14 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, Upload, CheckCircle2, Circle } from "lucide-react";
+import { Download, Upload, CheckCircle2, Circle, Pencil } from "lucide-react";
 import { requireUser, isManager } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canReviewEvidence } from "@/lib/permissions";
 import { cn, fmtDate } from "@/lib/utils";
 import { Badge, Card, Field, PageHeader } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { submitEvidence } from "../actions";
+import { deleteCampaign, submitEvidence } from "../actions";
+import { DeleteButton } from "@/components/delete-button";
 import { EvidenceItem, evidenceInclude } from "../evidence-item";
 
 export const metadata = { title: "Đợt minh chứng" };
@@ -38,9 +40,21 @@ export default async function CampaignDetail({ params, searchParams }: { params:
         description={`${campaign.agency} · ${fmtDate(campaign.openAt)} – ${fmtDate(campaign.closeAt)}${campaign.description ? ` · ${campaign.description}` : ""}`}
         actions={
           manager && (
-            <a href={`/api/minh-chung/${campaign.id}/bao-cao`} className="btn btn-secondary">
-              <Download className="size-4" aria-hidden /> Xuất báo cáo Excel
-            </a>
+            <>
+              <a href={`/api/minh-chung/${campaign.id}/bao-cao`} className="btn btn-secondary">
+                <Download className="size-4" aria-hidden /> Xuất báo cáo Excel
+              </a>
+              <Link href={`/minh-chung/${campaign.id}/sua`} className="btn btn-secondary">
+                <Pencil className="size-4" aria-hidden /> Sửa đợt
+              </Link>
+              <DeleteButton
+                action={deleteCampaign}
+                id={campaign.id}
+                text="Xóa đợt"
+                label={`Xóa đợt ${campaign.title}`}
+                confirm={`Xóa đợt “${campaign.title}”? Toàn bộ tiêu chí, minh chứng, lịch sử duyệt và tệp đính kèm sẽ bị xóa vĩnh viễn.`}
+              />
+            </>
           )
         }
       />

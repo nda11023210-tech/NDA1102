@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { requireRole, requireUser } from "@/lib/auth";
 import { PENDING_EVIDENCE } from "@/lib/permissions";
 import { attempt, fail, ok, type ActionState } from "@/lib/action-state";
-import { saveUploads } from "@/lib/uploads";
+import { deleteUpload, saveUploads } from "@/lib/uploads";
 import { fromLocalInput, str } from "@/lib/utils";
 
 const refresh = () => revalidatePath("/minh-chung", "layout");
@@ -123,4 +123,71 @@ export async function resubmitEvidence(_: ActionState, fd: FormData): Promise<Ac
     refresh();
     return ok("Đã nộp lại hồ sơ.");
   });
+}
+
+// ───────── Sửa / xóa đợt minh chứng và tiêu chí ─────────
+
+export async function updateCampaign(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const title = str(fd, "title");
+    const agency = str(fd, "agency");
+    const openAt = fromLocalInput(str(fd, "openAt"));
+    const closeAt = fromLocalInput(str(fd, "closeAt"));
+    if (!title || !agency || !openAt || !closeAt) return fail("Vui lòng nhập đủ tên đợt, cơ quan và thời hạn.");
+    if (closeAt <= openAt) return fail("Hạn nộp phải sau ngày mở.");
+    await db.evidenceCampaign.update({ where: { id }, data: { title, agency, openAt, closeAt, description: str(fd, "description") || null } });
+    refresh();
+    return ok("Đã cập nhật thông tin đợt minh chứng.");
+  });
+}
+
+/** Thêm mới (không có id) hoặc sửa một tiêu chí */
+export async function saveCriterion(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const campaignId = str(fd, "campaignId");
+    const code = str(fd, "code");
+    const title = str(fd, "title");
+    if (!code || !title) return fail("Vui lòng nhập mã và tên tiêu chí.");
+    if (id) {
+      await db.evidenceCriterion.update({ where: { id }, data: { code, title } });
+    } else {
+      const last = await db.evidenceCriterion.aggregate({ where: { campaignId }, _max: { order: true } });
+      await db.evidenceCriterion.create({ data: { campaignId, code, title, order: (last._max.order ?? -1) + 1 } });
+    }
+    refresh();
+    return ok(id ? "Đã lưu tiêu chí." : `Đã thêm tiêu chí ${code}.`);
+  });
+}
+
+export async function deleteCriterion(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const n = await db.evidence.count({ where: { criterionId: id } });
+    if (n) return fail(`Tiêu chí đã có ${n} minh chứng – không thể xóa. Có thể đổi tên tiêu chí thay vì xóa.`);
+    await db.evidenceCriterion.delete({ where: { id } });
+    refresh();
+    return ok("Đã xóa tiêu chí.");
+  });
+}
+
+/** Xóa cả đợt: tiêu chí, minh chứng, lịch sử duyệt và tệp đính kèm (kể cả tệp trên ổ đĩa) */
+export async function deleteCampaign(_: ActionState, fd: FormData): Promise<ActionState> {
+  let deleted = false;
+  const res = await attempt(async () => {
+    await requireRole("MANAGER");
+    const id = str(fd, "id");
+    const files = await db.attachment.findMany({ where: { evidence: { campaignId: id } }, select: { storedName: true } });
+    const c = await db.evidenceCampaign.delete({ where: { id } });
+    await Promise.all(files.map((f) => deleteUpload(f.storedName)));
+    refresh();
+    deleted = true;
+    return ok(`Đã xóa đợt “${c.title}”.`);
+  });
+  if (res?.ok && deleted) redirect("/minh-chung");
+  return res;
 }

@@ -1,12 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Clock, PenLine, Trash2, Eye } from "lucide-react";
+import { CheckCircle2, Clock, PenLine, Pencil, Eye } from "lucide-react";
 import { requireUser, isManager } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fmtDate, fmtDateTime, fmtRelative } from "@/lib/utils";
 import { ROLE_LABEL, normalizeRole, type Tone } from "@/lib/constants";
 import { AttachmentList, Avatar, Badge, Card, PageHeader, ProgressBar } from "@/components/ui";
-import { SubmitButton } from "@/components/forms";
-import { deleteDocument } from "../actions";
+import { deleteDocumentAction } from "../actions";
+import { DeleteButton } from "@/components/delete-button";
 import { SignForm } from "./sign-form";
 
 export const metadata = { title: "Chi tiết văn bản" };
@@ -57,12 +58,19 @@ export default async function DocumentDetail({ params }: { params: Promise<{ id:
         }
         actions={
           manager && (
-            <form action={deleteDocument}>
-              <input type="hidden" name="id" value={doc.id} />
-              <SubmitButton className="btn btn-danger-soft" confirm="Xóa văn bản này cùng toàn bộ tệp đính kèm và dữ liệu ký nhận?">
-                <Trash2 className="size-4" aria-hidden /> Xóa
-              </SubmitButton>
-            </form>
+            <>
+              <Link href={`/van-ban/${doc.id}/sua`} className="btn btn-secondary">
+                <Pencil className="size-4" aria-hidden /> Sửa
+              </Link>
+              <DeleteButton
+                action={deleteDocumentAction}
+                id={doc.id}
+                fields={{ from: "detail" }}
+                text="Xóa"
+                label={`Xóa văn bản ${doc.title}`}
+                confirm="Xóa văn bản này cùng toàn bộ tệp đính kèm và dữ liệu đọc/ký nhận?"
+              />
+            </>
           )
         }
       />
