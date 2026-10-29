@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Boxes, CheckCircle2, Wrench, HandHelping, Printer, Search, AlertTriangle } from "lucide-react";
 import type { Prisma } from "@prisma/client";
-import { requireUser, isManager } from "@/lib/auth";
+import { requireUser, isManager, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ASSET_CATEGORY, ASSET_STATUS } from "@/lib/constants";
 import { cn, fmtMoney } from "@/lib/utils";
@@ -18,6 +18,7 @@ type SP = { cat?: string; st?: string; q?: string };
 export default async function AssetsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
   const manager = isManager(user);
+  const admin = isAdmin(user);
   const sp = await searchParams;
 
   const where: Prisma.AssetWhereInput = {};
@@ -146,7 +147,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
                   <th>Vị trí</th>
                   <th>Trạng thái</th>
                   <th className="text-right">Nguyên giá</th>
-                  {manager && <th className="text-right">Thao tác</th>}
+                  {admin && <th className="text-right">Thao tác</th>}
                 </tr>
               </thead>
               <tbody>
@@ -168,7 +169,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
                       <StatusBadge map={ASSET_STATUS} value={a.status} />
                     </td>
                     <td className="text-right text-ink-muted tabular-nums">{fmtMoney(a.value)}</td>
-                    {manager && (
+                    {admin && (
                       <td>
                         <div className="flex items-start justify-end gap-1">
                           <Link href={`/tai-san/${a.code}#sua`} className="btn btn-ghost btn-sm" aria-label={`Sửa thiết bị ${a.code}`}>

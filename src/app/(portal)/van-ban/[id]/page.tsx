@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Clock, PenLine, Pencil, Eye } from "lucide-react";
-import { requireUser, isManager } from "@/lib/auth";
+import { requireUser, isManager, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fmtDate, fmtDateTime, fmtRelative } from "@/lib/utils";
 import { ROLE_LABEL, normalizeRole, type Tone } from "@/lib/constants";
@@ -30,6 +30,7 @@ export default async function DocumentDetail({ params }: { params: Promise<{ id:
   if (!mine.readAt) await db.documentReceipt.update({ where: { id: mine.id }, data: { readAt: new Date() } });
 
   const manager = isManager(user);
+  const admin = isAdmin(user);
   const tracking = manager
     ? await db.user.findMany({
         where: { active: true },
@@ -57,7 +58,7 @@ export default async function DocumentDetail({ params }: { params: Promise<{ id:
           </span>
         }
         actions={
-          manager && (
+          admin && (
             <>
               <Link href={`/van-ban/${doc.id}/sua`} className="btn btn-secondary">
                 <Pencil className="size-4" aria-hidden /> Sửa

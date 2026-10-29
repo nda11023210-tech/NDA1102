@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FileText, Plus, Paperclip, PenLine, Pencil, Search, CheckCircle2 } from "lucide-react";
 import type { Prisma } from "@prisma/client";
-import { requireUser, isManager } from "@/lib/auth";
+import { requireUser, isManager, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cn, fmtDate } from "@/lib/utils";
 import type { Tone } from "@/lib/constants";
@@ -17,6 +17,7 @@ type SP = { cat?: string; q?: string; f?: string };
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
   const manager = isManager(user);
+  const admin = isAdmin(user);
   const sp = await searchParams;
 
   const where: Prisma.DocumentWhereInput = {};
@@ -152,7 +153,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                   <time className="w-[84px] text-right tabular-nums">{fmtDate(d.issuedAt)}</time>
                 </div>
               </Link>
-              {manager && (
+              {admin && (
                 <div className="flex shrink-0 items-start gap-1 py-3 pr-3 sm:items-center sm:py-0">
                   <Link href={`/van-ban/${d.id}/sua`} className="btn btn-ghost btn-sm" aria-label={`Sửa văn bản ${d.title}`}>
                     <Pencil className="size-4" aria-hidden />
@@ -168,6 +169,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
       {manager && (
         <Disclosure summary="Quản lý danh mục văn bản" className="mt-6">
+          {admin && (
           <ul className="mb-5 divide-y divide-line rounded-lg border border-line">
             {categories.map((c) => (
               <li key={c.id} className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-start">
@@ -199,6 +201,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
               </li>
             ))}
           </ul>
+          )}
           <ActionForm action={createCategory} className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-end">
             <div className="flex-1">
               <label htmlFor="cat-name" className="label">

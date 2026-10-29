@@ -1,13 +1,15 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckSquare, Play, Send, Star, RotateCcw, CheckCircle2 } from "lucide-react";
-import { isManager, requireUser } from "@/lib/auth";
+import { CheckSquare, Play, Send, Star, RotateCcw, CheckCircle2, Pencil } from "lucide-react";
+import { isAdmin, isManager, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { TASK_PRIORITY, TASK_STATUS } from "@/lib/constants";
 import { taskTimeliness } from "@/lib/performance";
 import { fmtDateTime, fmtRelative } from "@/lib/utils";
 import { AttachmentList, Avatar, Badge, Card, Field, PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { addComment, updateTaskStatus } from "../actions";
+import { addComment, deleteTask, updateTaskStatus } from "../actions";
+import { DeleteButton } from "@/components/delete-button";
 
 export const metadata = { title: "Chi tiết công việc" };
 
@@ -44,6 +46,23 @@ export default async function TaskDetail({ params }: { params: Promise<{ id: str
             <StatusBadge map={TASK_PRIORITY} value={task.priority} />
             <span>Khối lượng {task.workload}/5</span>
           </span>
+        }
+        actions={
+          isAdmin(user) && (
+            <>
+              <Link href={`/cong-viec/${task.id}/sua`} className="btn btn-secondary">
+                <Pencil className="size-4" aria-hidden /> Sửa
+              </Link>
+              <DeleteButton
+                action={deleteTask}
+                id={task.id}
+                fields={{ from: "detail" }}
+                text="Xóa"
+                label={`Xóa công việc ${task.title}`}
+                confirm={`Xóa công việc “${task.title}” cùng trao đổi và tệp đính kèm? Việc này sẽ không còn được tính vào hiệu suất.`}
+              />
+            </>
+          )
         }
       />
 

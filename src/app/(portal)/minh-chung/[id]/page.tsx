@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download, Upload, CheckCircle2, Circle, Pencil } from "lucide-react";
-import { requireUser, isManager } from "@/lib/auth";
+import { requireUser, isManager, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canReviewEvidence } from "@/lib/permissions";
 import { cn, fmtDate } from "@/lib/utils";
@@ -18,6 +18,7 @@ export default async function CampaignDetail({ params, searchParams }: { params:
   const { tc } = await searchParams;
   const user = await requireUser();
   const manager = isManager(user);
+  const admin = isAdmin(user);
   const campaign = await db.evidenceCampaign.findUnique({
     where: { id },
     include: { criteria: { orderBy: { order: "asc" }, include: { evidences: { select: { status: true } } } } },
@@ -44,6 +45,8 @@ export default async function CampaignDetail({ params, searchParams }: { params:
               <a href={`/api/minh-chung/${campaign.id}/bao-cao`} className="btn btn-secondary">
                 <Download className="size-4" aria-hidden /> Xuất báo cáo Excel
               </a>
+              {admin && (
+              <>
               <Link href={`/minh-chung/${campaign.id}/sua`} className="btn btn-secondary">
                 <Pencil className="size-4" aria-hidden /> Sửa đợt
               </Link>
@@ -54,6 +57,8 @@ export default async function CampaignDetail({ params, searchParams }: { params:
                 label={`Xóa đợt ${campaign.title}`}
                 confirm={`Xóa đợt “${campaign.title}”? Toàn bộ tiêu chí, minh chứng, lịch sử duyệt và tệp đính kèm sẽ bị xóa vĩnh viễn.`}
               />
+              </>
+              )}
             </>
           )
         }

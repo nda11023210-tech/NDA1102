@@ -12,7 +12,7 @@ export const metadata = { title: "Sửa văn bản" };
 
 export default async function EditDocument({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireRole("MANAGER");
+  await requireRole("ADMIN");
   const [doc, categories] = await Promise.all([
     db.document.findUnique({ where: { id }, include: { attachments: true, _count: { select: { receipts: { where: { signedAt: { not: null } } } } } } }),
     db.docCategory.findMany({ orderBy: { name: "asc" } }),

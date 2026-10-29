@@ -11,6 +11,7 @@ export async function saveArticle(_: ActionState, fd: FormData): Promise<ActionS
   let id = str(fd, "id");
   const res = await attempt(async () => {
     const user = await requireRole("MANAGER");
+    if (id && user.role !== "ADMIN") return fail("Chỉ Quản trị viên được sửa bài viết đã đăng.");
     const title = str(fd, "title");
     const category = str(fd, "category");
     const content = str(fd, "content");
@@ -28,7 +29,7 @@ export async function saveArticle(_: ActionState, fd: FormData): Promise<ActionS
 }
 
 export async function deleteArticle(fd: FormData) {
-  await requireRole("MANAGER");
+  await requireRole("ADMIN");
   await db.kbArticle.delete({ where: { id: str(fd, "id") } });
   revalidatePath("/tri-thuc", "layout");
   redirect("/tri-thuc");

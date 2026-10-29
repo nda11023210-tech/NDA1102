@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { isManager, requireRole, requireUser } from "@/lib/auth";
 import { attempt, fail, ok, type ActionState } from "@/lib/action-state";
-import { saveUploads } from "@/lib/uploads";
+import { deleteUpload, saveUploads } from "@/lib/uploads";
 import { TASK_PRIORITY } from "@/lib/constants";
 import { fromLocalInput, str } from "@/lib/utils";
 
@@ -98,4 +99,55 @@ export async function addComment(_: ActionState, fd: FormData): Promise<ActionSt
     refresh(taskId);
     return ok("Đã gửi trao đổi.");
   });
+}
+
+// ───────── Sửa / xóa công việc – chỉ Quản trị viên ─────────
+
+export async function updateTask(_: ActionState, fd: FormData): Promise<ActionState> {
+  let id = "";
+  const res = await attempt(async () => {
+    const user = await requireRole("ADMIN");
+    id = str(fd, "id");
+    const title = str(fd, "title");
+    const dueAt = fromLocalInput(str(fd, "dueAt"));
+    const assigneeId = str(fd, "assigneeId");
+    const priority = str(fd, "priority");
+    const workload = Math.min(5, Math.max(1, Number(str(fd, "workload")) || 2));
+    if (!title || !dueAt || !assigneeId) return fail("Vui lòng nhập tên công việc, hạn chót và người thực hiện.");
+    if (!TASK_PRIORITY[priority]) return fail("Mức ưu tiên không hợp lệ.");
+    await db.task.update({
+      where: { id },
+      data: { title, description: str(fd, "description") || null, criteria: str(fd, "criteria") || null, assigneeId, priority, workload, dueAt },
+    });
+    const removeIds = fd.getAll("removeAttachment").map(String);
+    if (removeIds.length) {
+      const files = await db.attachment.findMany({ where: { id: { in: removeIds }, taskId: id } });
+      await db.attachment.deleteMany({ where: { id: { in: files.map((f) => f.id) } } });
+      await Promise.all(files.map((f) => deleteUpload(f.storedName)));
+    }
+    await saveUploads(fd, user.id, { taskId: id });
+    return ok("Đã cập nhật công việc.");
+  });
+  if (res?.ok) {
+    refresh(id);
+    redirect(`/cong-viec/${id}`);
+  }
+  return res;
+}
+
+/** Xóa công việc kèm trao đổi và tệp đính kèm (điểm hiệu suất sẽ không còn tính việc này) */
+export async function deleteTask(_: ActionState, fd: FormData): Promise<ActionState> {
+  let fromDetail = false;
+  const res = await attempt(async () => {
+    await requireRole("ADMIN");
+    const id = str(fd, "id");
+    const files = await db.attachment.findMany({ where: { taskId: id }, select: { storedName: true } });
+    const t = await db.task.delete({ where: { id } });
+    await Promise.all(files.map((f) => deleteUpload(f.storedName)));
+    refresh();
+    fromDetail = str(fd, "from") === "detail";
+    return ok(`Đã xóa công việc “${t.title}”.`);
+  });
+  if (res?.ok && fromDetail) redirect("/cong-viec?tab=tat-ca");
+  return res;
 }

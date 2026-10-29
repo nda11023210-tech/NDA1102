@@ -11,7 +11,7 @@ export const metadata = { title: "Sửa đợt minh chứng" };
 
 export default async function EditCampaign({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireRole("MANAGER");
+  await requireRole("ADMIN");
   const campaign = await db.evidenceCampaign.findUnique({
     where: { id },
     include: { criteria: { orderBy: { order: "asc" }, include: { _count: { select: { evidences: true } } } }, _count: { select: { evidences: true } } },

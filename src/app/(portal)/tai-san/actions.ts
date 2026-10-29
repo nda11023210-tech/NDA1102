@@ -44,7 +44,7 @@ export async function createAsset(_: ActionState, fd: FormData): Promise<ActionS
 export async function updateAsset(_: ActionState, fd: FormData): Promise<ActionState> {
   let newCode = "";
   const res = await attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const code = str(fd, "code").toUpperCase();
     const name = str(fd, "name");
@@ -82,7 +82,7 @@ export async function updateAsset(_: ActionState, fd: FormData): Promise<ActionS
 export async function deleteAsset(_: ActionState, fd: FormData): Promise<ActionState> {
   let deleted = false;
   const res = await attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const active = await db.assetLoan.count({ where: { assetId: id, status: { in: ["PENDING", "APPROVED"] } } });
     if (active) return fail("Thiết bị đang có yêu cầu mượn chờ duyệt hoặc đang được mượn. Hãy xử lý xong việc mượn/trả trước khi xóa.");

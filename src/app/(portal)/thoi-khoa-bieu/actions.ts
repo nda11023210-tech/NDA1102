@@ -47,7 +47,7 @@ export async function unpublishTimetable(fd: FormData) {
 }
 
 export async function deleteTimetable(fd: FormData) {
-  await requireRole("MANAGER");
+  await requireRole("ADMIN");
   await db.timetable.delete({ where: { id: str(fd, "id") } });
   refresh();
   redirect("/thoi-khoa-bieu");
@@ -90,10 +90,11 @@ export async function toggleLock(entryId: string): Promise<ActionState> {
 
 export async function saveRoom(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    const user = await requireRole("MANAGER");
     const code = str(fd, "code").toUpperCase();
     const type = str(fd, "type");
     if (!code || !["LAB", "THEORY"].includes(type)) return fail("Vui lòng nhập mã phòng và loại phòng.");
+    if (user.role !== "ADMIN" && (await db.room.findUnique({ where: { code } }))) return fail("Phòng với mã này đã tồn tại – chỉ Quản trị viên được sửa.");
     await db.room.upsert({
       where: { code },
       create: { code, name: str(fd, "name") || code, type, capacity: Number(str(fd, "capacity")) || 40 },
@@ -106,9 +107,10 @@ export async function saveRoom(_: ActionState, fd: FormData): Promise<ActionStat
 
 export async function saveClassGroup(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    const user = await requireRole("MANAGER");
     const code = str(fd, "code").toUpperCase();
     if (!code) return fail("Vui lòng nhập mã lớp.");
+    if (user.role !== "ADMIN" && (await db.classGroup.findUnique({ where: { code } }))) return fail("Lớp với mã này đã tồn tại – chỉ Quản trị viên được sửa.");
     await db.classGroup.upsert({
       where: { code },
       create: { code, name: str(fd, "name") || code, size: Number(str(fd, "size")) || 35 },
@@ -121,11 +123,12 @@ export async function saveClassGroup(_: ActionState, fd: FormData): Promise<Acti
 
 export async function saveSubject(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    const user = await requireRole("MANAGER");
     const code = str(fd, "code").toUpperCase();
     const kind = str(fd, "kind");
     const name = str(fd, "name");
     if (!code || !name || !["MD", "MH"].includes(kind)) return fail("Vui lòng nhập mã, tên và loại học phần.");
+    if (user.role !== "ADMIN" && (await db.subject.findUnique({ where: { code } }))) return fail("Học phần với mã này đã tồn tại – chỉ Quản trị viên được sửa.");
     await db.subject.upsert({
       where: { code },
       create: { code, name, kind, hours: Number(str(fd, "hours")) || 60 },
@@ -154,7 +157,7 @@ export async function createAssignment(_: ActionState, fd: FormData): Promise<Ac
 }
 
 export async function deleteAssignment(fd: FormData) {
-  await requireRole("MANAGER");
+  await requireRole("ADMIN");
   await db.teachingAssignment.delete({ where: { id: str(fd, "id") } });
   refresh();
 }
@@ -163,7 +166,7 @@ export async function deleteAssignment(fd: FormData) {
 
 export async function saveClassSubject(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    const user = await requireRole("MANAGER");
     const classGroupId = str(fd, "classGroupId");
     const subjectId = str(fd, "subjectId");
     const sessionsPerWeek = Number(str(fd, "sessionsPerWeek"));
@@ -171,6 +174,7 @@ export async function saveClassSubject(_: ActionState, fd: FormData): Promise<Ac
     if (!(sessionsPerWeek >= 1 && sessionsPerWeek <= 5)) return fail("Số buổi/tuần từ 1 đến 5 (mỗi ngày tối đa 1 buổi cùng môn).");
     const others = await db.classSubject.aggregate({ where: { classGroupId, NOT: { subjectId } }, _sum: { sessionsPerWeek: true } });
     if ((others._sum.sessionsPerWeek ?? 0) + sessionsPerWeek > 10) return fail("Tổng số buổi của lớp vượt quá 10 buổi/tuần.");
+    if (user.role !== "ADMIN" && (await db.classSubject.findUnique({ where: { classGroupId_subjectId: { classGroupId, subjectId } } }))) return fail("Môn này đã có trong kế hoạch lớp – chỉ Quản trị viên được sửa số buổi.");
     await db.classSubject.upsert({
       where: { classGroupId_subjectId: { classGroupId, subjectId } },
       create: { classGroupId, subjectId, sessionsPerWeek },
@@ -182,7 +186,7 @@ export async function saveClassSubject(_: ActionState, fd: FormData): Promise<Ac
 }
 
 export async function deleteClassSubject(fd: FormData) {
-  await requireRole("MANAGER");
+  await requireRole("ADMIN");
   await db.classSubject.delete({ where: { id: str(fd, "id") } });
   refresh();
 }
@@ -204,7 +208,7 @@ const inUseMessage = (what: string, names: string[]) =>
 
 export async function deleteRoom(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const names = await usedInTimetables({ roomId: id });
     if (names.length) return fail(inUseMessage("Phòng", names));
@@ -216,7 +220,7 @@ export async function deleteRoom(_: ActionState, fd: FormData): Promise<ActionSt
 
 export async function deleteClassGroup(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const names = await usedInTimetables({ classGroupId: id });
     if (names.length) return fail(inUseMessage("Lớp", names));
@@ -228,7 +232,7 @@ export async function deleteClassGroup(_: ActionState, fd: FormData): Promise<Ac
 
 export async function deleteSubject(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const names = await usedInTimetables({ subjectId: id });
     if (names.length) return fail(inUseMessage("Học phần", names));

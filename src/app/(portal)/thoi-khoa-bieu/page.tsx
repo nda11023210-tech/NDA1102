@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CalendarRange, Sparkles, Send, Trash2, Undo2 } from "lucide-react";
-import { requireUser } from "@/lib/auth";
+import { requireUser, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canManageTimetable } from "@/lib/permissions";
 import { loadTimetable } from "@/lib/timetable";
@@ -20,6 +20,7 @@ type SP = { tt?: string; view?: "khoa" | "gv" | "lop" | "phong"; id?: string };
 export default async function TimetablePage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
   const manager = canManageTimetable(user);
+  const admin = isAdmin(user);
   const sp = await searchParams;
 
   const versions = await db.timetable.findMany({
@@ -139,7 +140,7 @@ export default async function TimetablePage({ searchParams }: { searchParams: Pr
                   </SubmitButton>
                 </form>
               )}
-              {tt.status !== "PUBLISHED" && (
+              {admin && tt.status !== "PUBLISHED" && (
                 <form action={deleteTimetable}>
                   <input type="hidden" name="id" value={tt.id} />
                   <SubmitButton className="btn btn-danger-soft" confirm="Xóa phiên bản thời khóa biểu này?">

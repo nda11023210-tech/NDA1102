@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ClipboardCheck, CalendarClock, Building2, Pencil } from "lucide-react";
-import { requireUser, isManager } from "@/lib/auth";
+import { requireUser, isManager, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cn, fmtDate, fmtRelative, toLocalInput } from "@/lib/utils";
 import { Badge, EmptyState, Field, PageHeader, ProgressBar } from "@/components/ui";
@@ -13,6 +13,7 @@ export const metadata = { title: "Minh chứng Sở ban ngành" };
 export default async function CampaignsPage() {
   const user = await requireUser();
   const manager = isManager(user);
+  const admin = isAdmin(user);
   const campaigns = await db.evidenceCampaign.findMany({
     orderBy: { closeAt: "desc" },
     include: {
@@ -106,7 +107,7 @@ export default async function CampaignsPage() {
                   </div>
                 </div>
               </Link>
-              {manager && (
+              {admin && (
                 <div className="flex items-start justify-end gap-1 border-t border-line px-4 py-2">
                   <Link href={`/minh-chung/${c.id}/sua`} className="btn btn-ghost btn-sm">
                     <Pencil className="size-4" aria-hidden /> Sửa

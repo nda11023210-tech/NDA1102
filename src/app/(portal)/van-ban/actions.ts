@@ -65,16 +65,6 @@ export async function signDocument(_: ActionState, fd: FormData): Promise<Action
   });
 }
 
-export async function deleteDocument(fd: FormData) {
-  await requireRole("MANAGER");
-  const id = str(fd, "id");
-  const files = await db.attachment.findMany({ where: { documentId: id } });
-  await db.document.delete({ where: { id } });
-  await Promise.all(files.map((f) => deleteUpload(f.storedName)));
-  revalidatePath("/van-ban");
-  redirect("/van-ban");
-}
-
 export async function createCategory(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
     await requireRole("MANAGER");
@@ -95,7 +85,7 @@ export async function createCategory(_: ActionState, fd: FormData): Promise<Acti
 export async function updateDocument(_: ActionState, fd: FormData): Promise<ActionState> {
   let id = "";
   const res = await attempt(async () => {
-    const user = await requireRole("MANAGER");
+    const user = await requireRole("ADMIN");
     id = str(fd, "id");
     const title = str(fd, "title");
     const categoryId = str(fd, "categoryId");
@@ -138,7 +128,7 @@ export async function updateDocument(_: ActionState, fd: FormData): Promise<Acti
 /** Xóa văn bản (dùng cho nút xóa có hiển thị lỗi) */
 export async function deleteDocumentAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const res = await attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const files = await db.attachment.findMany({ where: { documentId: id } });
     const d = await db.document.delete({ where: { id } });
@@ -152,7 +142,7 @@ export async function deleteDocumentAction(_: ActionState, fd: FormData): Promis
 
 export async function updateCategory(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const name = str(fd, "name");
     if (!name) return fail("Vui lòng nhập tên danh mục.");
@@ -164,7 +154,7 @@ export async function updateCategory(_: ActionState, fd: FormData): Promise<Acti
 
 export async function deleteCategory(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const n = await db.document.count({ where: { categoryId: id } });
     if (n) return fail(`Danh mục đang có ${n} văn bản – hãy chuyển hoặc xóa các văn bản đó trước.`);

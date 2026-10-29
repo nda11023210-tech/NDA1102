@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { ScanLine } from "lucide-react";
-import { requireUser, isManager } from "@/lib/auth";
+import { requireUser, isManager, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { assetQrSvg } from "@/lib/qr";
 import { ASSET_CATEGORY, ASSET_STATUS, INVENTORY_CONDITION, LOAN_STATUS } from "@/lib/constants";
@@ -16,6 +16,7 @@ export default async function AssetDetail({ params }: { params: Promise<{ code: 
   const { code } = await params;
   const user = await requireUser();
   const manager = isManager(user);
+  const admin = isAdmin(user);
   const asset = await db.asset.findUnique({
     where: { code: decodeURIComponent(code).toUpperCase() },
     include: {
@@ -39,7 +40,7 @@ export default async function AssetDetail({ params }: { params: Promise<{ code: 
         title={asset.name}
         back={{ href: "/tai-san", label: "Danh mục thiết bị" }}
         actions={
-          manager && (
+          admin && (
             <DeleteButton
               action={deleteAsset}
               id={asset.id}
@@ -201,7 +202,7 @@ export default async function AssetDetail({ params }: { params: Promise<{ code: 
             </Card>
           )}
 
-          {manager && (
+          {admin && (
             <Card title={<span id="sua" className="scroll-mt-6">Sửa thông tin thiết bị</span>}>
               <ActionForm action={updateAsset} resetOnSuccess={false}>
                 <input type="hidden" name="id" value={asset.id} />

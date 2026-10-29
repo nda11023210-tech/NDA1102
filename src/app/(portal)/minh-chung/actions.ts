@@ -129,7 +129,7 @@ export async function resubmitEvidence(_: ActionState, fd: FormData): Promise<Ac
 
 export async function updateCampaign(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const title = str(fd, "title");
     const agency = str(fd, "agency");
@@ -146,7 +146,7 @@ export async function updateCampaign(_: ActionState, fd: FormData): Promise<Acti
 /** Thêm mới (không có id) hoặc sửa một tiêu chí */
 export async function saveCriterion(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const campaignId = str(fd, "campaignId");
     const code = str(fd, "code");
@@ -165,7 +165,7 @@ export async function saveCriterion(_: ActionState, fd: FormData): Promise<Actio
 
 export async function deleteCriterion(_: ActionState, fd: FormData): Promise<ActionState> {
   return attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const n = await db.evidence.count({ where: { criterionId: id } });
     if (n) return fail(`Tiêu chí đã có ${n} minh chứng – không thể xóa. Có thể đổi tên tiêu chí thay vì xóa.`);
@@ -179,7 +179,7 @@ export async function deleteCriterion(_: ActionState, fd: FormData): Promise<Act
 export async function deleteCampaign(_: ActionState, fd: FormData): Promise<ActionState> {
   let deleted = false;
   const res = await attempt(async () => {
-    await requireRole("MANAGER");
+    await requireRole("ADMIN");
     const id = str(fd, "id");
     const files = await db.attachment.findMany({ where: { evidence: { campaignId: id } }, select: { storedName: true } });
     const c = await db.evidenceCampaign.delete({ where: { id } });

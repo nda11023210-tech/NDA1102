@@ -1,5 +1,5 @@
 import { Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
-import { requireRole } from "@/lib/auth";
+import { isAdmin, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { SUBJECT_KIND } from "@/lib/constants";
 import { allocateLecturers, MAX_PER_LECTURER, validateInput, type Kind, type RoomType } from "@/lib/scheduler";
@@ -24,7 +24,8 @@ import {
 export const metadata = { title: "Phân công giảng dạy" };
 
 export default async function AssignmentsPage() {
-  await requireRole("MANAGER");
+  const user = await requireRole("MANAGER");
+  const admin = isAdmin(user); // xóa dữ liệu: chỉ Quản trị viên
   const [staff, classes, subjects, rooms, fixed, plans, prefs, planInput] = await Promise.all([
     db.user.findMany({ where: { active: true, role: { not: "ADMIN" } }, orderBy: { name: "asc" } }),
     db.classGroup.findMany({ orderBy: { code: "asc" } }),
@@ -152,6 +153,7 @@ export default async function AssignmentsPage() {
                               {regs === 0 && <span className="ml-2 text-xs font-medium text-amber-700">· chưa ai đăng ký</span>}
                             </span>
                             <span className="text-ink-muted tabular-nums">{p.sessionsPerWeek} buổi/tuần</span>
+                            {admin && (
                             <form action={deleteClassSubject}>
                               <input type="hidden" name="id" value={p.id} />
                               <SubmitButton className="btn btn-ghost btn-sm text-red-600" confirm={`Bỏ ${p.subject.name} khỏi kế hoạch lớp ${c.code}?`}>
@@ -159,6 +161,7 @@ export default async function AssignmentsPage() {
                                 <span className="sr-only">Bỏ khỏi kế hoạch</span>
                               </SubmitButton>
                             </form>
+                            )}
                           </li>
                         );
                       })}
@@ -218,6 +221,7 @@ export default async function AssignmentsPage() {
                     <span className="min-w-0 flex-1">
                       <span className="font-medium">{a.lecturer.name}</span> · {a.subject.code} {a.subject.name} · {a.classGroup.code} · {a.sessionsPerWeek} buổi
                     </span>
+                    {admin && (
                     <form action={deleteAssignment}>
                       <input type="hidden" name="id" value={a.id} />
                       <SubmitButton className="btn btn-ghost btn-sm text-red-600" confirm="Xóa phân công cố định này?">
@@ -225,6 +229,7 @@ export default async function AssignmentsPage() {
                         <span className="sr-only">Xóa phân công</span>
                       </SubmitButton>
                     </form>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -302,7 +307,7 @@ export default async function AssignmentsPage() {
                   <span>
                     <span className="font-medium">{r.code}</span> <span className="text-ink-muted">· {r.type === "LAB" ? "Thực hành" : "Lý thuyết"} · {r.capacity} chỗ</span>
                   </span>
-                  <DeleteButton action={deleteRoom} id={r.id} label={`Xóa phòng ${r.code}`} confirm={`Xóa phòng ${r.code}?`} />
+                  {admin && <DeleteButton action={deleteRoom} id={r.id} label={`Xóa phòng ${r.code}`} confirm={`Xóa phòng ${r.code}?`} />}
                 </li>
               ))}
             </ul>
@@ -335,7 +340,7 @@ export default async function AssignmentsPage() {
                   <span>
                     <span className="font-medium">{c.code}</span> <span className="text-ink-muted">· {c.size} SV</span>
                   </span>
-                  <DeleteButton action={deleteClassGroup} id={c.id} label={`Xóa lớp ${c.code}`} confirm={`Xóa lớp ${c.code}? Kế hoạch giảng dạy và phân công cố định của lớp cũng bị xóa.`} />
+                  {admin && <DeleteButton action={deleteClassGroup} id={c.id} label={`Xóa lớp ${c.code}`} confirm={`Xóa lớp ${c.code}? Kế hoạch giảng dạy và phân công cố định của lớp cũng bị xóa.`} />}
                 </li>
               ))}
             </ul>
@@ -362,12 +367,14 @@ export default async function AssignmentsPage() {
                   <span className="min-w-0">
                     <Badge tone={s.kind === "MD" ? "violet" : "blue"}>{SUBJECT_KIND[s.kind].short}</Badge> <span className="font-mono text-xs">{s.code}</span> {s.name}
                   </span>
+                  {admin && (
                   <DeleteButton
                     action={deleteSubject}
                     id={s.id}
                     label={`Xóa học phần ${s.code}`}
                     confirm={`Xóa học phần ${s.code} ${s.name}? Kế hoạch, phân công cố định và đăng ký môn liên quan cũng bị xóa.`}
                   />
+                  )}
                 </li>
               ))}
             </ul>

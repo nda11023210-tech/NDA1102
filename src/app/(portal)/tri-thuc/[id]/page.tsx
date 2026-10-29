@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { requireUser } from "@/lib/auth";
+import { isAdmin, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canManageKb } from "@/lib/permissions";
 import { fmtDateTime } from "@/lib/utils";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { Disclosure, SubmitButton } from "@/components/forms";
@@ -17,7 +16,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   const user = await requireUser();
   const article = await db.kbArticle.findUnique({ where: { id }, include: { createdBy: true } });
   if (!article) notFound();
-  const manage = canManageKb(user);
+  const manage = isAdmin(user); // sửa/xóa bài viết: chỉ Quản trị viên
   const cats = manage ? await db.kbArticle.findMany({ distinct: ["category"], select: { category: true } }) : [];
 
   return (

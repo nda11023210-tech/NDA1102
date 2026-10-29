@@ -38,5 +38,8 @@ export function hasRole(user: { role: Role }, ...roles: Role[]) {
   return user.role === "ADMIN" || roles.includes(user.role);
 }
 
+/** Chỉ Quản trị viên được SỬA và XÓA dữ liệu trên toàn hệ thống */
+export const isAdmin = (user: { role: Role }) => user.role === "ADMIN";
+
 /** Quản lý khoa (hoặc Quản trị viên) */
 export const isManager = (user: { role: Role }) => hasRole(user, "MANAGER");
